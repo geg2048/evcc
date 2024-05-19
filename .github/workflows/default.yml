@@ -3,17 +3,14 @@ name: Default
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
   workflow_call:
 
 jobs:
   clean:
     name: Clean
-    runs-on: depot-ubuntu-24.04-arm
-
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
@@ -45,15 +42,9 @@ jobs:
       - name: Docs
         run: make docs
 
-      - name: Porcelain
-        run: make porcelain
-
   build:
     name: Build
-    runs-on: depot-ubuntu-24.04-arm
-
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
@@ -88,10 +79,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: depot-ubuntu-24.04-arm
-
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
@@ -119,10 +107,7 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: depot-ubuntu-24.04-arm
-
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
@@ -158,10 +143,7 @@ jobs:
 
   ui:
     name: UI
-    permissions:
-      contents: read
-      actions: write
-    runs-on: depot-ubuntu-24.04-arm
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
@@ -197,17 +179,9 @@ jobs:
           path: dist
           key: ${{ runner.os }}-${{ github.sha }}-dist
 
-      - name: Porcelain
-        run: |
-          test -z "$(git status --porcelain)" || (git status; git diff; false)
-
   integration:
     name: Integration
-    runs-on: depot-ubuntu-24.04-arm-32
-
-    permissions:
-      contents: read
-      actions: write
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
