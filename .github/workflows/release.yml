@@ -11,7 +11,7 @@ on:
 jobs:
   call-build-workflow:
     if: startsWith(github.ref, 'refs/tags')
-    uses: evcc-io/evcc/.github/workflows/default.yml@master
+    uses: geg2048/evcc/.github/workflows/default.yml@master
 
   docker:
     name: Publish Docker :release
@@ -27,8 +27,9 @@ jobs:
       - name: Login
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PASS }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
@@ -37,8 +38,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            evcc/evcc
+          images: ${{ github.repository }}
 
       - name: Publish
         uses: docker/build-push-action@v5
@@ -48,79 +48,7 @@ jobs:
           push: true
           build-args: |
             RELEASE=1
-            TESLA_CLIENT_ID=${{ secrets.TESLA_CLIENT_ID }}
           tags: ${{ steps.meta.outputs.tags }}
-
-  apt:
-    name: Github & APT
-    needs:
-      - call-build-workflow
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-        id: go
-
-      - name: Install Cloudsmith CLI
-        run: pip install --upgrade cloudsmith-cli
-
-      - name: Patch ASN1
-        run: make patch-asn1-sudo
-
-      - name: Get dist from cache
-        uses: actions/cache/restore@v4
-        id: cache-dist
-        with:
-          path: dist
-          key: ${{ runner.os }}-${{ github.sha }}-dist
-
-      # gokrazy image
-      # - name: Prepare Image
-      #   run: |
-      #     make prepare-image
-      #     sed -i -e 's#-ld.*$#& -X github.com/evcc-io/evcc/server/updater.Password=${{ secrets.IMAGE_PASS }}#' buildflags/github.com/evcc-io/evcc/buildflags.txt
-      #     mkdir /home/runner/.config/gokrazy
-      #     echo ${{ secrets.IMAGE_PASS }}> /home/runner/.config/gokrazy/http-password.txt
-
-      # - name: Build Image
-      #   run: make image
-
-      # - name: Build Root Filesystem
-      #   run: make image-rootfs
-
-      - name: Create Github Release
-        uses: goreleaser/goreleaser-action@v5
-        with:
-          version: latest
-          args: release --clean
-        env:
-          # use GH_TOKEN for access to evcc-io/homebrew-tap
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          TESLA_CLIENT_ID: ${{ secrets.TESLA_CLIENT_ID }}
-
-      - name: Publish .deb to Cloudsmith
-        env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
-        run: make apt-release
-
-  demo:
-    name: Demo
-    needs:
-      - docker
-    runs-on: ubuntu-latest
-    env:
-      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --local-only --config packaging/fly.toml
 
   hassio:
     name: Hassio Addon
