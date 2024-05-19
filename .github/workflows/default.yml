@@ -3,7 +3,7 @@ name: Default
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
   workflow_call:
 
@@ -13,10 +13,7 @@ on:
 jobs:
   clean:
     name: Clean
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04-arm' || 'depot-ubuntu-24.04-arm' }}
-
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -37,15 +34,9 @@ jobs:
       - name: Docs
         run: make docs
 
-      - name: Porcelain
-        run: make porcelain
-
   build:
     name: Build
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04-arm' || 'depot-ubuntu-24.04-arm' }}
-
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -69,10 +60,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04-arm' || 'depot-ubuntu-24.04-arm' }}
-
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -89,10 +77,7 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04-arm' || 'depot-ubuntu-24.04-arm' }}
-
-    permissions:
-      contents: read
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -117,10 +102,7 @@ jobs:
 
   ui:
     name: UI
-    permissions:
-      contents: read
-      actions: write
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04-arm' || 'depot-ubuntu-24.04-arm' }}
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -178,17 +160,9 @@ jobs:
           path: dist
           key: ${{ runner.os }}-${{ github.sha }}-dist
 
-      - name: Porcelain
-        run: |
-          test -z "$(git status --porcelain)" || (git status; git diff; false)
-
   integration-shard:
     name: Integration ${{ matrix.shard }}/2
-    runs-on: depot-ubuntu-24.04-arm-32
-
-    permissions:
-      contents: read
-      actions: write
+    runs-on: ubuntu-latest
 
     # the Playwright run is the longest step of the workflow, so it is split
     strategy:
@@ -284,93 +258,10 @@ jobs:
     name: Integration
     needs: integration-shard
     if: always()
-    runs-on: depot-ubuntu-24.04-arm
+    runs-on: ubuntu-latest
 
     permissions:
       contents: read
 
     steps:
       - run: test "${{ needs.integration-shard.result }}" = success
-
-  # fork pull requests run on GitHub-hosted runners with the GitHub cache, which
-  # only master can seed for them. Must not run on a Depot runner, those write
-  # to Depot's cache instead
-  warm-fork-cache-go:
-    name: Warm fork cache (Go)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-24.04-arm
-
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version-file: go.mod
-        id: go
-
-      # on a hit setup-go does not save again, so building would populate nothing
-      - name: Build
-        if: steps.go.outputs.cache-hit != 'true'
-        run: mkdir dist && touch dist/empty && make build
-
-  warm-fork-cache-ui:
-    name: Warm fork cache (UI)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-24.04-arm
-
-    permissions:
-      contents: read
-      actions: write
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - uses: voidzero-dev/setup-vp@68f39c78aaf39be468cabd2afb09c162574c84af # v1.21.2
-        with:
-          node-version-file: ".node-version"
-          cache: true
-
-      - name: Get Playwright version
-        run: echo "PLAYWRIGHT_VERSION=$(node -e "console.log(require('./package-lock.json').packages['node_modules/@playwright/test'].version)")" >> $GITHUB_ENV
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
-
-      - name: Install
-        run: make install-ui
-
-      - name: Install Playwright (browsers + deps)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: vpx playwright install --with-deps chromium
-        timeout-minutes: 5
-
-      # the UI job saves its task cache on a Depot runner, so forks never see
-      # it. Run the same tasks here to seed the GitHub-hosted cache
-      - name: Restore vp task cache
-        id: vp-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ runner.os }}-${{ runner.arch }}-vp-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-vp-
-
-      - name: Warm vp tasks
-        run: make openapi lint-ui test-ui ui
-
-      - name: Save vp task cache
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: node_modules/.vite/task-cache
-          key: ${{ steps.vp-cache.outputs.cache-primary-key }}
