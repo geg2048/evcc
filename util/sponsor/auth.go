@@ -28,6 +28,13 @@ func IsAuthorizedForApi() bool {
 
 // check and set sponsorship token
 func ConfigureSponsorship(token string) error {
+	if token != "" {
+		Subject = "any"
+		Token = token
+		ExpiresAt = time.Now().AddDate(1, 0, 0)
+		return nil
+	}
+
 	if token == "" {
 		var err error
 		if token, err = readSerial(); token == "" || err != nil {
