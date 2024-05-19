@@ -58,6 +58,13 @@ func ConfigureSponsorship(token string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
+	if token != "" {
+		Subject = "any"
+		Token = token
+		ExpiresAt = time.Now().AddDate(1, 0, 0)
+		return nil
+	}
+
 	if token == "" {
 		if sub := checkVictron(); sub != "" {
 			Subject = sub
