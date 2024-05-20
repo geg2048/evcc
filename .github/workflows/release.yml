@@ -60,7 +60,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
         with:
-          repository: evcc-io/hassio-addon
+          repository: geg2048/hass-addons
           token: ${{ secrets.GH_TOKEN }}
           path: ./hassio
 
