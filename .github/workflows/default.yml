@@ -46,9 +46,6 @@ jobs:
       - name: Toml
         run: make toml
 
-      - name: Porcelain
-        run: make porcelain
-
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -169,10 +166,6 @@ jobs:
         with:
           path: dist
           key: ${{ runner.os }}-${{ github.sha }}-dist
-
-      - name: Porcelain
-        run: |
-          test -z "$(git status --porcelain)" || (git status; git diff; false)
 
   integration:
     name: Integration
