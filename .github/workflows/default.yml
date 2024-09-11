@@ -1,7 +1,7 @@
 name: Default
 
 env:
-  GO_VERSION: ^1.22
+  GO_VERSION: ^1.23
 
 on:
   push:
@@ -71,7 +71,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "npm"
 
       - run: mkdir dist && touch dist/empty
@@ -145,7 +145,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "npm"
 
       - name: Install
@@ -192,7 +192,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "npm"
 
       - name: Build UI

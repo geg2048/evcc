@@ -23,6 +23,7 @@ type Delta struct {
 	curr    float64
 	base    uint16
 	enabled bool
+	isBasic bool
 }
 
 const (
@@ -76,7 +77,7 @@ func NewDeltaFromConfig(other map[string]interface{}) (api.Charger, error) {
 		return nil, err
 	}
 
-	return NewDelta(cc.URI, cc.Device, cc.Comset, cc.Baudrate, modbus.ProtocolFromRTU(cc.RTU), cc.ID, cc.Connector)
+	return NewDelta(cc.URI, cc.Device, cc.Comset, cc.Baudrate, cc.Settings.Protocol(), cc.ID, cc.Connector)
 }
 
 // NewDelta creates Delta charger
@@ -100,6 +101,11 @@ func NewDelta(uri, device, comset string, baudrate int, proto modbus.Protocol, s
 	}
 
 	wb.base = connector * 1000
+
+	// check for basic or smart register set
+	if _, err := wb.conn.ReadInputRegisters(wb.base+deltaRegEvseChargerState, 1); err != nil {
+		wb.isBasic = true
+	}
 
 	b, err := wb.conn.ReadHoldingRegisters(deltaRegCommunicationTimeoutEnabled, 1)
 	if err != nil {
@@ -151,15 +157,41 @@ func (wb *Delta) Status() (api.ChargeStatus, error) {
 	// 8: Not ready
 	// 9: Faulted
 	switch s := encoding.Uint16(b); s {
-	case 0, 1, 2, 3:
+	case 0, 1, 2:
 		return api.StatusA, nil
-	case 5, 6, 7:
+	case 3:
+		if wb.isBasic {
+			return api.StatusA, nil
+		}
+		return api.StatusB, nil
+	case 5, 6, 7, 9:
 		return api.StatusB, nil
 	case 4:
 		return api.StatusC, nil
 	default:
 		return api.StatusNone, fmt.Errorf("invalid status: %0x", s)
 	}
+}
+
+var _ api.StatusReasoner = (*Delta)(nil)
+
+// statusReason implements the api.StatusReasoner interface
+func (wb *Delta) StatusReason() (api.Reason, error) {
+	if !wb.isBasic {
+		b, err := wb.conn.ReadInputRegisters(wb.base+deltaRegEvseState, 1)
+		if err != nil {
+			return api.ReasonUnknown, err
+		}
+
+		switch s := encoding.Uint16(b); s {
+		case 3:
+			return api.ReasonWaitingForAuthorization, nil
+		case 5:
+			return api.ReasonDisconnectRequired, nil
+		}
+	}
+
+	return api.ReasonUnknown, nil
 }
 
 // Enabled implements the api.Charger interface

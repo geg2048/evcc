@@ -43,7 +43,9 @@
 							:editable="!gridMeter || !!gridMeter.id"
 							:error="deviceError('meter', gridMeter?.name)"
 							data-testid="grid"
-							@edit="gridMeter?.id ? editMeter(gridMeter.id, 'pv') : addMeter('grid')"
+							@edit="
+								gridMeter?.id ? editMeter(gridMeter.id, 'grid') : addMeter('grid')
+							"
 						>
 							<template #icon>
 								<shopicon-regular-powersupply></shopicon-regular-powersupply>
@@ -231,7 +233,7 @@
 									>
 										<hr v-if="idx > 0" />
 										<p class="my-2 fw-bold">
-											{{ circuit.config.title }}
+											{{ circuit.config?.title }}
 											<code>({{ circuit.name }})</code>
 										</p>
 										<DeviceTags :tags="circuitTags(circuit)" />

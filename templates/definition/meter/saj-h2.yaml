@@ -3,6 +3,9 @@ products:
   - brand: SAJ
     description:
       generic: H2 Series Hybrid Solar Inverter
+  - brand: Ampere
+    description:
+      generic: Ampere.StoragePro
 params:
   - name: usage
     choice: ["grid", "pv", "battery"]
@@ -94,7 +97,5 @@ render: |
       type: holding
       decode: uint16
     scale: 0.01
-  {{- if .capacity }}
   capacity: {{ .capacity }} # kWh
-  {{- end }}
   {{- end }}
