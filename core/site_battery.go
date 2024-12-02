@@ -1,6 +1,8 @@
 package core
 
 import (
+	"errors"
+
 	"github.com/evcc-io/evcc/api"
 	"github.com/evcc-io/evcc/core/keys"
 	"github.com/evcc-io/evcc/core/loadpoint"
@@ -8,6 +10,10 @@ import (
 
 func batteryModeModified(mode api.BatteryMode) bool {
 	return mode != api.BatteryUnknown && mode != api.BatteryNormal
+}
+
+func (site *Site) batteryConfigured() bool {
+	return len(site.batteryMeters) > 0
 }
 
 // GetBatteryMode returns the battery mode
@@ -45,6 +51,8 @@ func (site *Site) requiredBatteryMode(batteryGridChargeActive bool, rate api.Rat
 	}
 
 	switch {
+	case !site.batteryConfigured():
+		res = api.BatteryUnknown
 	case batteryGridChargeActive:
 		res = mapper(api.BatteryCharge)
 	case site.dischargeControlActive(rate):
@@ -60,7 +68,7 @@ func (site *Site) requiredBatteryMode(batteryGridChargeActive bool, rate api.Rat
 func (site *Site) applyBatteryMode(mode api.BatteryMode) error {
 	for _, meter := range site.batteryMeters {
 		if batCtrl, ok := meter.(api.BatteryController); ok {
-			if err := batCtrl.SetBatteryMode(mode); err != nil {
+			if err := batCtrl.SetBatteryMode(mode); err != nil && !errors.Is(err, api.ErrNotAvailable) {
 				return err
 			}
 		}

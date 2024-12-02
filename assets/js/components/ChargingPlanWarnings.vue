@@ -1,15 +1,15 @@
 <template>
-	<p class="mb-0" data-testid="plan-warnings">
-		<span v-if="targetIsAboveLimit" class="d-block text-secondary mb-1">
+	<p class="mb-3 root" data-testid="plan-warnings">
+		<span v-if="targetIsAboveLimit" class="d-block evcc-gray mb-1">
 			{{ $t("main.targetCharge.targetIsAboveLimit", { limit: limitFmt }) }}
 		</span>
-		<span v-if="['off', 'now'].includes(mode)" class="d-block text-secondary mb-1">
+		<span v-if="['off', 'now'].includes(mode)" class="d-block evcc-gray mb-1">
 			{{ $t("main.targetCharge.onlyInPvMode") }}
 		</span>
-		<span v-if="timeTooFarInTheFuture" class="d-block text-secondary mb-1">
+		<span v-if="timeTooFarInTheFuture" class="d-block evcc-gray mb-1">
 			{{ $t("main.targetCharge.targetIsTooFarInTheFuture") }}
 		</span>
-		<span v-if="costLimitExists" class="d-block text-secondary mb-1">
+		<span v-if="costLimitExists" class="d-block evcc-gray mb-1">
 			{{ $t("main.targetCharge.costLimitIgnore", { limit: costLimitText }) }}
 		</span>
 		<span v-if="notReachableInTime" class="d-block text-warning mb-1">
@@ -109,7 +109,7 @@ export default {
 			return this.fmtWh(this.planEnergy * 1e3);
 		},
 		costLimitExists: function () {
-			return this.smartCostLimit !== 0;
+			return this.smartCostLimit !== null;
 		},
 		costLimitText: function () {
 			if (this.isCo2) {
@@ -132,3 +132,9 @@ export default {
 	},
 };
 </script>
+
+<style scoped>
+.root:empty {
+	display: none;
+}
+</style>

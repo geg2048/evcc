@@ -12,6 +12,9 @@ const (
 	LimitEnergy      = "limitEnergy" // limit energy
 	EnableThreshold  = "enableThreshold"
 	DisableThreshold = "disableThreshold"
+	EnableDelay      = "enableDelay"
+	DisableDelay     = "disableDelay"
+	BatteryBoost     = "batteryBoost"
 
 	PhasesConfigured = "phasesConfigured" // configured phases (1/3, 0 for auto on 1p3p chargers, nil for plain chargers)
 	PhasesEnabled    = "phasesEnabled"    // enabled phases (1/3)
@@ -35,6 +38,7 @@ const (
 
 	// effective values
 	EffectivePriority   = "effectivePriority"   // effective priority
+	EffectivePlanId     = "effectivePlanId"     // effective plan id
 	EffectivePlanTime   = "effectivePlanTime"   // effective plan time
 	EffectivePlanSoc    = "effectivePlanSoc"    // effective plan soc
 	EffectiveMinCurrent = "effectiveMinCurrent" // effective min current
@@ -63,6 +67,9 @@ const (
 	PlanProjectedStart = "planProjectedStart" // charge plan start time (earliest slot)
 	PlanProjectedEnd   = "planProjectedEnd"   // charge plan ends (end of last slot)
 	PlanOverrun        = "planOverrun"        // charge plan goal not reachable in time
+
+	// repeating plans
+	RepeatingPlans = "repeatingPlans" // key to access all repeating plans in db
 
 	// remote control
 	RemoteDisabled       = "remoteDisabled"       // remote disabled
