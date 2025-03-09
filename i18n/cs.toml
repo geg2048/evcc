@@ -5,6 +5,7 @@ control = "Ovládání baterie"
 discharge = "Zabránit vybití v rychlém režimu a plánovaném nabíjení."
 disclaimerHint = "Poznámka:"
 disclaimerText = "Tato nastavení ovlivňují pouze solární režim. Chování dobíjení je příslušně upraveno."
+gridChargeTab = "Nabíjení ze sítě"
 legendBottomName = "priorita domu"
 legendBottomSubline = "nepoužito pro dobíjení"
 legendMiddleName = "nejdříve vozidlo"
@@ -14,6 +15,7 @@ legendTopAutostart = "startuje automaticky"
 legendTopName = "dobíjení podporované baterií"
 legendTopSubline = "bez přerušování"
 modalTitle = "Nastavení baterie"
+usageTab = "Využití baterie"
 
 [batterySettings.bufferStart]
 above = "když je nad {soc}"
@@ -28,9 +30,29 @@ never = "pouze když je dost přebytků"
 titleAdd = "Přidat měřič baterie"
 titleEdit = "Upravit měřič baterie"
 
+[config.charge]
+titleAdd = "Přidat měřič nabití"
+titleEdit = "Upravit měřič nabití"
+
+[config.charger]
+chargers = "EV nabíječky"
+ocppHelp = "Zkopíruj tuto adresu do nastavení nabíječky"
+ocppLabel = "OCPP-Server URL"
+switchsockets = "Přepínatelné zásuvky"
+template = "Výrobce"
+titleAdd = "Přidat nabíječku"
+titleEdit = "Upravit nabíječku"
+
+[config.circuits]
+
+[config.control]
+description = "Obvykle jsou přednastavené hodnoty správné. Změňte jen pokud víte, co děláte. "
+
 [config.deviceValue]
 capacity = "Kapacita"
 chargeStatus = "Stav"
+chargeStatusA = "nepřipojeno"
+chargeStatusB = "připojeno"
 chargedEnergy = "Nabito"
 configured = "Nastaveno"
 currency = "Měna"
@@ -62,6 +84,10 @@ save = "Uložit"
 titleAdd = "Přidat měřič spotřeby ze sítě"
 titleEdit = "Editovat měřič spotřeby ze sítě"
 
+[config.hems]
+
+[config.influx]
+
 [config.main]
 addLoadpoint = "Přidat nabíjecí bod"
 addPvBattery = "Přidat solar nebo baterii"
@@ -73,6 +99,8 @@ unconfigured = "není konfigurováno"
 vehicles = "Má vozidla"
 yaml = "Konfigurováno v evcc.yaml. Není editovatelné v UI."
 
+[config.messaging]
+
 [config.meter]
 cancel = "Zrušit"
 delete = "Smazat"
@@ -81,7 +109,15 @@ template = "Výrobce"
 titleChoice = "Co chcete přidat?"
 validateSave = "Zkontrolovat a uložit"
 
+[config.modbusproxy]
+
+[config.mqtt]
+
+[config.network]
+
 [config.options]
+
+[config.options.boolean]
 
 [config.options.endianness]
 
@@ -97,7 +133,11 @@ titleEdit = "Editovat měřič solární energie"
 cancel = "Zrušit"
 save = "Uložit"
 
+[config.sponsor]
+
 [config.system]
+
+[config.tariffs]
 
 [config.title]
 
@@ -287,6 +327,8 @@ smartCostClean = "Nabíjení čistou energií ze sítě"
 title = "Nastavení {0}"
 vehicle = "Vozidlo"
 
+[main.loadpointSettings.batteryBoost]
+
 [main.loadpointSettings.limitSoc]
 description = "Nabíjecí strop, který je použit, když je vozidlo připojeno."
 label = "Výchozí strop"
@@ -374,13 +416,6 @@ tempLimit = "Teplotní strop"
 unknown = "Vozidlo hosta"
 vehicleSoc = "Nabití"
 
-[main.vehicleSoc]
-charging = "nabíjení"
-connected = "připojeno"
-disconnected = "odpojeno"
-ready = "připraveno"
-vehicleLimit = "Limit vozidla: {soc}"
-
 [main.vehicleStatus]
 charging = "Nabíjení..."
 cheapEnergyCharging = "Nabíjení levnou energií: {price} (limit {limit})"
@@ -442,6 +477,8 @@ title = "Nabíjecí relace"
 total = "Celkem"
 vehicle = "Vozidlo"
 
+[sessions.chartTitle]
+
 [sessions.csv]
 chargedenergy = "Energie (kWh)"
 created = "Vytvořeno"
@@ -457,6 +494,14 @@ vehicle = "Vozidlo"
 allLoadpoints = "všechny nabíjecí body"
 allVehicles = "všechny vozidla"
 filter = "Filtr"
+
+[sessions.group]
+
+[sessions.groupBy]
+
+[sessions.period]
+
+[sessions.type]
 
 [settings]
 title = "Základní nastavení"

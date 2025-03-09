@@ -111,7 +111,7 @@ export default {
 		size: String,
 		scale: Number,
 		required: Boolean,
-		validValues: { type: Array, default: () => [] },
+		choice: { type: Array, default: () => [] },
 		modelValue: [String, Number, Boolean, Object],
 	},
 	emits: ["update:modelValue"],
@@ -123,7 +123,7 @@ export default {
 			if (this.masked) {
 				return "password";
 			}
-			if (["Number", "Float", "Duration"].includes(this.type)) {
+			if (["Int", "Float", "Duration"].includes(this.type)) {
 				return "number";
 			}
 			return "text";
@@ -132,13 +132,13 @@ export default {
 			if (this.size) {
 				return this.size;
 			}
-			if (["Number", "Float", "Duration"].includes(this.type)) {
+			if (["Int", "Float", "Duration"].includes(this.type)) {
 				return "w-50 w-min-200";
 			}
 			return "";
 		},
 		endAlign() {
-			return ["Number", "Float", "Duration"].includes(this.type);
+			return ["Int", "Float", "Duration"].includes(this.type);
 		},
 		step() {
 			if (this.type === "Float" || this.type === "Duration") {
@@ -147,14 +147,14 @@ export default {
 			return null;
 		},
 		unitValue() {
+			if (this.type === "Duration") {
+				return this.fmtDurationUnit(this.value, this.unit);
+			}
 			if (this.unit) {
 				return this.unit;
 			}
 			if (this.property === "capacity") {
 				return "kWh";
-			}
-			if (this.type === "Duration") {
-				return this.fmtSecondUnit(this.value);
 			}
 			return null;
 		},
@@ -168,18 +168,21 @@ export default {
 			return this.type === "Bool";
 		},
 		array() {
-			return this.type === "StringList";
+			return this.type === "List";
 		},
 		select() {
-			return this.validValues.length > 0;
+			return this.choice.length > 0;
+		},
+		durationFactor() {
+			return this.unit === "minute" ? 60 : 1;
 		},
 		selectOptions() {
 			// If the valid values are already in the correct format, return them
-			if (typeof this.validValues[0] === "object") {
-				return this.validValues;
+			if (typeof this.choice[0] === "object") {
+				return this.choice;
 			}
 
-			let values = [...this.validValues];
+			let values = [...this.choice];
 
 			if (this.icons && !this.required) {
 				values = ["", ...values];
@@ -211,7 +214,7 @@ export default {
 				}
 
 				if (this.type === "Duration" && typeof this.modelValue === "number") {
-					return this.modelValue / NS_PER_SECOND;
+					return this.modelValue / this.durationFactor / NS_PER_SECOND;
 				}
 
 				return this.modelValue;
@@ -228,7 +231,7 @@ export default {
 				}
 
 				if (this.type === "Duration" && typeof newValue === "number") {
-					newValue = newValue * NS_PER_SECOND;
+					newValue = newValue * this.durationFactor * NS_PER_SECOND;
 				}
 
 				this.$emit("update:modelValue", newValue);

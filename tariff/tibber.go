@@ -2,7 +2,6 @@ package tariff
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"sync"
 	"time"
@@ -41,7 +40,7 @@ func NewTibberFromConfig(other map[string]interface{}) (api.Tariff, error) {
 	}
 
 	if cc.Token == "" {
-		return nil, errors.New("missing token")
+		return nil, api.ErrMissingToken
 	}
 
 	if err := cc.init(); err != nil {
@@ -81,8 +80,7 @@ func (t *Tibber) run(done chan error) {
 		"id": graphql.ID(t.homeID),
 	}
 
-	tick := time.NewTicker(time.Hour)
-	for ; true; <-tick.C {
+	for tick := time.Tick(time.Hour); ; <-tick {
 		var res struct {
 			Viewer struct {
 				Home struct {

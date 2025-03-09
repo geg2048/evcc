@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"dario.cat/mergo"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -184,10 +186,9 @@ type Param struct {
 	Default       string       `json:",omitempty"` // default value if no user value is provided in the configuration
 	Example       string       `json:",omitempty"` // cli example value
 	Value         string       `json:"-"`          // user provided value via cli configuration
-	Values        []string     `json:",omitempty"` // user provided list of values e.g. for Type "stringlist"
+	Values        []string     `json:",omitempty"` // user provided list of values e.g. for Type "list"
 	Usages        []string     `json:",omitempty"` // restrict param to these usage types, e.g. "battery" for home battery capacity
 	Type          ParamType    // string representation of the value type, "string" is default
-	ValidValues   []string     `json:",omitempty"` // list of valid values the user can provide
 	Choice        []string     `json:",omitempty"` // defines a set of choices, e.g. "grid", "pv", "battery", "charge" for "usage"
 	AllInOne      *bool        `json:"-"`          // defines if the defined usages can all be present in a single device
 
@@ -201,7 +202,7 @@ type Param struct {
 // DefaultValue returns a default or example value depending on the renderMode
 func (p *Param) DefaultValue(renderMode int) interface{} {
 	// return empty list to allow iterating over in template
-	if p.Type == TypeStringList {
+	if p.Type == TypeList {
 		return []string{}
 	}
 
@@ -243,6 +244,30 @@ func (p *Param) IsAllInOne() bool {
 	return p.AllInOne != nil && *p.AllInOne
 }
 
+// yamlQuote quotes strings for yaml if they would otherwise by modified by the unmarshaler
+func (p *Param) yamlQuote(value string) string {
+	if p.Type != TypeString {
+		return value
+	}
+
+	input := fmt.Sprintf("key: %s", value)
+
+	var res struct {
+		Value string `yaml:"key"`
+	}
+
+	if err := yaml.Unmarshal([]byte(input), &res); err != nil || value != res.Value {
+		return quote(value)
+	}
+
+	// fix 0815, but not 0
+	if strings.HasPrefix(value, "0") && len(value) > 1 {
+		return quote(value)
+	}
+
+	return value
+}
+
 // Product contains naming information about a product a template supports
 type Product struct {
 	Brand       string       // product brand
@@ -253,6 +278,14 @@ func (p Product) Title(lang string) string {
 	return strings.TrimSpace(fmt.Sprintf("%s %s", p.Brand, p.Description.String(lang)))
 }
 
+type CountryCode string
+
+func (c CountryCode) IsValid() bool {
+	// ensure ISO 3166-1 alpha-2 format
+	validCode := regexp.MustCompile(`^[A-Z]{2}$`)
+	return validCode.MatchString(string(c))
+}
+
 // TemplateDefinition contains properties of a device template
 type TemplateDefinition struct {
 	Template     string
@@ -261,6 +294,7 @@ type TemplateDefinition struct {
 	Covers       []string         `json:",omitempty"` // list of covered outdated template names
 	Products     []Product        `json:",omitempty"` // list of products this template is compatible with
 	Capabilities []string         `json:",omitempty"`
+	Countries    []CountryCode    `json:",omitempty"` // list of countries supported by this template
 	Requirements Requirements     `json:",omitempty"`
 	Linked       []LinkedTemplate `json:",omitempty"` // a list of templates that should be processed as part of the guided setup
 	Params       []Param          `json:",omitempty"`

@@ -54,8 +54,7 @@ func (t *SmartEnergy) run(done chan error) {
 	var once sync.Once
 	client := request.NewHelper(t.log)
 
-	tick := time.NewTicker(time.Hour)
-	for ; true; <-tick.C {
+	for tick := time.Tick(time.Hour); ; <-tick {
 		var res smartenergy.Prices
 
 		if err := backoff.Retry(func() error {
@@ -69,9 +68,13 @@ func (t *SmartEnergy) run(done chan error) {
 
 		data := make(api.Rates, 0, len(res.Data))
 		for _, r := range res.Data {
+			if r.Date.Minute() != 0 {
+				continue
+			}
+
 			ar := api.Rate{
 				Start: r.Date.Local(),
-				End:   r.Date.Add(15 * time.Minute).Local(),
+				End:   r.Date.Add(time.Hour).Local(),
 				Price: t.totalPrice(r.Value/100, r.Date),
 			}
 			data = append(data, ar)

@@ -18,6 +18,7 @@ package charger
 // SOFTWARE.
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"time"
@@ -33,6 +34,8 @@ const (
 	vestelRegBrand           = 190 // 10
 	vestelRegModel           = 210 // 5
 	vestelRegFirmware        = 230 // 50
+	vestelRegNumberPhases    = 404
+	vestelRegPhasesSwitch    = 405
 	vestelRegChargeStatus    = 1001
 	vestelRegCableStatus     = 1004
 	vestelRegChargeTime      = 1508
@@ -60,11 +63,13 @@ type Vestel struct {
 }
 
 func init() {
-	registry.Add("vestel", NewVestelFromConfig)
+	registry.AddCtx("vestel", NewVestelFromConfig)
 }
 
+//go:generate go tool decorate -f decorateVestel -b *Vestel -r api.Charger -t "api.PhaseSwitcher,Phases1p3p,func(int) error" -t "api.PhaseGetter,GetPhases,func() (int, error)"
+
 // NewVestelFromConfig creates a Vestel charger from generic config
-func NewVestelFromConfig(other map[string]interface{}) (api.Charger, error) {
+func NewVestelFromConfig(ctx context.Context, other map[string]interface{}) (api.Charger, error) {
 	cc := modbus.TcpSettings{
 		ID: 255,
 	}
@@ -73,12 +78,12 @@ func NewVestelFromConfig(other map[string]interface{}) (api.Charger, error) {
 		return nil, err
 	}
 
-	return NewVestel(cc.URI, cc.ID)
+	return NewVestel(ctx, cc.URI, cc.ID)
 }
 
 // NewVestel creates a Vestel charger
-func NewVestel(uri string, id uint8) (*Vestel, error) {
-	conn, err := modbus.NewConnection(uri, "", "", 0, modbus.Tcp, id)
+func NewVestel(ctx context.Context, uri string, id uint8) (api.Charger, error) {
+	conn, err := modbus.NewConnection(ctx, uri, "", "", 0, modbus.Tcp, id)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +101,15 @@ func NewVestel(uri string, id uint8) (*Vestel, error) {
 		current: 6,
 	}
 
+	var (
+		phasesS func(int) error
+		phasesG func() (int, error)
+	)
+	if b, err := wb.conn.ReadInputRegisters(vestelRegNumberPhases, 1); err == nil && binary.BigEndian.Uint16(b) == 1 {
+		phasesS = wb.phases1p3p
+		phasesG = wb.getPhases
+	}
+
 	// get failsafe timeout from charger
 	b, err := wb.conn.ReadHoldingRegisters(vestelRegFailsafeTimeout, 1)
 	if err != nil {
@@ -108,13 +122,19 @@ func NewVestel(uri string, id uint8) (*Vestel, error) {
 	if timeout < time.Second {
 		timeout = time.Second
 	}
-	go wb.heartbeat(timeout)
+	go wb.heartbeat(ctx, timeout)
 
-	return wb, nil
+	return decorateVestel(wb, phasesS, phasesG), err
 }
 
-func (wb *Vestel) heartbeat(timeout time.Duration) {
-	for range time.Tick(timeout) {
+func (wb *Vestel) heartbeat(ctx context.Context, timeout time.Duration) {
+	for tick := time.Tick(timeout); ; {
+		select {
+		case <-tick:
+		case <-ctx.Done():
+			return
+		}
+
 		if _, err := wb.conn.WriteSingleRegister(vestelRegAlive, 1); err != nil {
 			wb.log.ERROR.Println("heartbeat:", err)
 		}
@@ -262,6 +282,21 @@ func (wb *Vestel) Voltages() (float64, float64, float64, error) {
 	return wb.getPhaseValues(vestelRegVoltages, 1)
 }
 
+// phases1p3p implements the api.PhaseSwitcher interface
+func (wb *Vestel) phases1p3p(phases int) error {
+	_, err := wb.conn.WriteSingleRegister(vestelRegPhasesSwitch, uint16((phases-1)>>1))
+	return err
+}
+
+// getPhases implements the api.PhaseGetter interface
+func (wb *Vestel) getPhases() (int, error) {
+	b, err := wb.conn.ReadHoldingRegisters(vestelRegPhasesSwitch, 1)
+	if err != nil {
+		return 0, err
+	}
+	return 1 + int(binary.BigEndian.Uint16(b))<<1, nil
+}
+
 var _ api.Diagnosis = (*Vestel)(nil)
 
 // Diagnose implements the api.Diagnosis interface
@@ -279,6 +314,12 @@ func (wb *Vestel) Diagnose() {
 		fmt.Printf("Firmware:\t%s\n", b)
 	}
 	if b, err := wb.conn.ReadHoldingRegisters(vestelRegFailsafeTimeout, 1); err == nil {
-		fmt.Printf("Failsafe timeout (plain):\t%d\n", binary.BigEndian.Uint16(b))
+		fmt.Printf("Failsafe timeout:\t%#x\n", binary.BigEndian.Uint16(b))
+	}
+	if b, err := wb.conn.ReadInputRegisters(vestelRegNumberPhases, 1); err == nil {
+		fmt.Printf("Number of phases:\t%#x\n", binary.BigEndian.Uint16(b))
+	}
+	if b, err := wb.conn.ReadHoldingRegisters(vestelRegPhasesSwitch, 1); err == nil {
+		fmt.Printf("Phase switch:\t%#x\n", binary.BigEndian.Uint16(b))
 	}
 }

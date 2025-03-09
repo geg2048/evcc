@@ -134,7 +134,6 @@ export default {
 		planTimeUnreachable: Boolean,
 		planOverrun: Number,
 		rangePerSoc: Number,
-		smartCostLimit: Number,
 		smartCostType: String,
 		socBasedPlanning: Boolean,
 		socBasedCharging: Boolean,
@@ -272,6 +271,7 @@ export default {
 			this.modal.show();
 		},
 		updateTargetTimeLabel: function () {
+			if (!this.effectivePlanTime) return "";
 			const targetDate = new Date(this.effectivePlanTime);
 			this.targetTimeLabel = this.fmtAbsoluteDate(targetDate);
 		},
