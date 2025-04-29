@@ -25,7 +25,7 @@
 	</div>
 </template>
 <script>
-import formatter, { POWER_UNIT } from "../../mixins/formatter";
+import formatter, { POWER_UNIT } from "@/mixins/formatter";
 
 const NO_TRUNCATE = ["phasePowers", "phaseVoltages", "phaseCurrents"];
 
@@ -52,6 +52,7 @@ export default {
 			}
 			switch (name) {
 				case "power":
+				case "solarForecast":
 					return this.fmtW(value);
 				case "energy":
 				case "capacity":

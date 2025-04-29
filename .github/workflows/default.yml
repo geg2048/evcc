@@ -39,9 +39,6 @@ jobs:
       - name: Docs
         run: make docs
 
-      - name: Toml
-        run: make toml
-
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -124,10 +121,10 @@ jobs:
       - run: mkdir dist && touch dist/empty
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
-          args: --out-format=colored-line-number --timeout 5m
+          args: --timeout 5m
 
   ui:
     name: UI

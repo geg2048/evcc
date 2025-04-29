@@ -64,11 +64,11 @@
 <script>
 import JsonModal from "./JsonModal.vue";
 import FormRow from "./FormRow.vue";
-import Sponsor, { VICTRON_DEVICE } from "../Sponsor.vue";
-import SponsorTokenExpires from "../SponsorTokenExpires.vue";
-import store from "../../store";
-import { docsPrefix } from "../../i18n";
-import { cleanYaml } from "../../utils/cleanYaml";
+import Sponsor, { VICTRON_DEVICE } from "../Savings/Sponsor.vue";
+import SponsorTokenExpires from "../Savings/SponsorTokenExpires.vue";
+import store from "@/store";
+import { docsPrefix } from "@/i18n";
+import { cleanYaml } from "@/utils/cleanYaml";
 export default {
 	name: "SponsorModal",
 	components: { FormRow, JsonModal, Sponsor, SponsorTokenExpires },

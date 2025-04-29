@@ -1,34 +1,5 @@
+import type { TimeseriesEntry, SolarDetails } from "../components/Forecast/types";
 import deepCopy from "./deepClone";
-
-export interface TimeseriesEntry {
-	val: number;
-	ts: string;
-}
-
-export interface PriceSlot {
-	start: string;
-	end: string;
-	price: number;
-}
-
-export interface EnergyByDay {
-	energy: number;
-	complete: boolean;
-}
-
-export interface SolarDetails {
-	scale?: number;
-	today?: EnergyByDay;
-	tomorrow?: EnergyByDay;
-	dayAfterTomorrow?: EnergyByDay;
-	timeseries?: TimeseriesEntry[];
-}
-
-export interface Forecast {
-	grid?: PriceSlot[];
-	co2?: PriceSlot[];
-	solar?: SolarDetails;
-}
 
 export enum ForecastType {
 	Solar = "solar",
@@ -73,15 +44,22 @@ export function highestSlotIndexByDay(entries: TimeseriesEntry[], day: number = 
 	return entries.findIndex((entry) => entry.ts === highestEntry.ts);
 }
 
-export function adjustedSolar(solar: SolarDetails | undefined): SolarDetails | undefined {
+export function adjustedSolar(solar?: SolarDetails): SolarDetails | undefined {
 	if (!solar?.scale) return solar;
 
 	const { scale } = solar;
 	const result = deepCopy(solar);
-	result.today.energy *= scale;
-	result.tomorrow.energy *= scale;
-	result.dayAfterTomorrow.energy *= scale;
-	result.timeseries?.forEach((entry) => (entry.val *= scale));
+
+	if (result.today) result.today.energy *= scale;
+	if (result.tomorrow) result.tomorrow.energy *= scale;
+	if (result.dayAfterTomorrow) result.dayAfterTomorrow.energy *= scale;
+	if (result.timeseries) {
+		result.timeseries.forEach((entry) => {
+			entry.val *= scale;
+		});
+	}
+
 	result.scale = 1 / scale; // invert to allow back-adjustment
+
 	return result;
 }

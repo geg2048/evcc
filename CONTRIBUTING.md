@@ -89,6 +89,14 @@ npm install
 npm run dev
 ```
 
+#### Storybook
+
+We're using storybook to develop and visualize UI components in different states. Running the command below will open your browser at http://127.0.0.1:6006/.
+
+```sh
+npm run storybook
+```
+
 #### Integration testing
 
 We use Playwright for end-to-end integration tests. They start a local evcc instance with different configuration yamls and prefilled databases. To run them, you have to do a local build first.
@@ -122,7 +130,7 @@ If you find a text that is not yet translatable in [Weblate](https://hosted.webl
 - [UI: Add missing translation for Error during startup](https://github.com/evcc-io/evcc/pull/14695)
 - [Translation: kein Plan, keine Grenze](https://github.com/evcc-io/evcc/pull/7461/)
 
-Note: To ensure the build succeeds after creating new translations, make sure to include your new translations in both the [de.toml](i18n/de.toml) and [en.toml](i18n/en.toml) files.
+Note: To ensure the build succeeds after creating new translations, make sure to include your new translations in both the [de.json](i18n/de.json) and [en.json](i18n/en.json) files.
 
 [![Languages](https://hosted.weblate.org/widgets/evcc/-/evcc/multi-auto.svg)](https://hosted.weblate.org/engage/evcc/)
 

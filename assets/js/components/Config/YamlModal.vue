@@ -45,9 +45,9 @@
 </template>
 
 <script>
-import GenericModal from "../GenericModal.vue";
-import api from "../../api";
-import { docsPrefix } from "../../i18n";
+import GenericModal from "../Helper/GenericModal.vue";
+import api from "@/api";
+import { docsPrefix } from "@/i18n";
 import YamlEditor from "./YamlEditor.vue";
 
 export default {

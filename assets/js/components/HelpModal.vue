@@ -140,7 +140,7 @@
 import Modal from "bootstrap/js/dist/modal";
 import { docsPrefix } from "../i18n";
 import { performRestart } from "../restart";
-import { isLoggedIn, openLoginModal } from "../auth";
+import { isLoggedIn, openLoginModal } from "./Auth/auth";
 
 export default {
 	name: "HelpModal",

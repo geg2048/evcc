@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math"
@@ -29,6 +30,7 @@ import (
 	"github.com/evcc-io/evcc/tariff"
 	"github.com/evcc-io/evcc/util"
 	"github.com/evcc-io/evcc/util/config"
+	"github.com/evcc-io/evcc/util/modbus"
 	"github.com/evcc-io/evcc/util/telemetry"
 	"github.com/samber/lo"
 	"github.com/smallnest/chanx"
@@ -45,6 +47,8 @@ type updater interface {
 
 // measurement is used as slice element for publishing structured data
 type measurement struct {
+	Title         string    `json:"title,omitempty"`
+	Icon          string    `json:"icon,omitempty"`
 	Power         float64   `json:"power"`
 	Energy        float64   `json:"energy,omitempty"`
 	Powers        []float64 `json:"powers,omitempty"`
@@ -77,12 +81,12 @@ type Site struct {
 	MaxGridSupplyWhileBatteryCharging_ float64 `mapstructure:"maxGridSupplyWhileBatteryCharging"` // ignore battery charging if AC consumption is above this value
 
 	// meters
-	circuit       api.Circuit // Circuit
-	gridMeter     api.Meter   // Grid usage meter
-	pvMeters      []api.Meter // PV generation meters
-	batteryMeters []api.Meter // Battery charging meters
-	extMeters     []api.Meter // External meters - for monitoring only
-	auxMeters     []api.Meter // Auxiliary meters
+	circuit       api.Circuit                // Circuit
+	gridMeter     api.Meter                  // Grid usage meter
+	pvMeters      []config.Device[api.Meter] // PV generation meters
+	batteryMeters []config.Device[api.Meter] // Battery charging meters
+	extMeters     []config.Device[api.Meter] // External meters - for monitoring only
+	auxMeters     []config.Device[api.Meter] // Auxiliary meters
 
 	// battery settings
 	prioritySoc             float64  // prefer battery up to this Soc
@@ -100,14 +104,16 @@ type Site struct {
 	pvEnergy    map[string]*meterEnergy
 
 	// cached state
-	gridPower       float64         // Grid power
-	pvPower         float64         // PV power
-	excessDCPower   float64         // PV excess DC charge power (hybrid only)
-	auxPower        float64         // Aux power
-	batteryPower    float64         // Battery power (charge negative, discharge positive)
-	batterySoc      float64         // Battery soc
-	batteryCapacity float64         // Battery capacity
-	batteryMode     api.BatteryMode // Battery mode (runtime only, not persisted)
+	gridPower                float64         // Grid power
+	pvPower                  float64         // PV power
+	excessDCPower            float64         // PV excess DC charge power (hybrid only)
+	auxPower                 float64         // Aux power
+	batteryPower             float64         // Battery power (charge negative, discharge positive)
+	batterySoc               float64         // Battery soc
+	batteryCapacity          float64         // Battery capacity
+	batteryMode              api.BatteryMode // Battery mode (runtime only, not persisted)
+	batteryModeExternal      api.BatteryMode // Battery mode (external, runtime only, not persisted)
+	batteryModeExternalTimer time.Time       // Battery mode timer for external control
 }
 
 // MetersConfig contains the site's meter configuration
@@ -197,7 +203,7 @@ func (site *Site) Boot(log *util.Logger, loadpoints []*Loadpoint, tariffs *tarif
 		if err != nil {
 			return err
 		}
-		site.pvMeters = append(site.pvMeters, dev.Instance())
+		site.pvMeters = append(site.pvMeters, dev)
 
 		// accumulator
 		site.pvEnergy[ref] = &meterEnergy{clock: clock.New()}
@@ -209,7 +215,7 @@ func (site *Site) Boot(log *util.Logger, loadpoints []*Loadpoint, tariffs *tarif
 		if err != nil {
 			return err
 		}
-		site.batteryMeters = append(site.batteryMeters, dev.Instance())
+		site.batteryMeters = append(site.batteryMeters, dev)
 	}
 
 	// meters used only for monitoring
@@ -218,7 +224,7 @@ func (site *Site) Boot(log *util.Logger, loadpoints []*Loadpoint, tariffs *tarif
 		if err != nil {
 			return err
 		}
-		site.extMeters = append(site.extMeters, dev.Instance())
+		site.extMeters = append(site.extMeters, dev)
 	}
 
 	// auxiliary meters
@@ -227,7 +233,7 @@ func (site *Site) Boot(log *util.Logger, loadpoints []*Loadpoint, tariffs *tarif
 		if err != nil {
 			return err
 		}
-		site.auxMeters = append(site.auxMeters, dev.Instance())
+		site.auxMeters = append(site.auxMeters, dev)
 	}
 
 	if site.MaxGridSupplyWhileBatteryCharging_ != 0 {
@@ -323,14 +329,28 @@ func (site *Site) restoreSettings() error {
 	fcstEnergy, err := settings.Float(keys.SolarAccForecast)
 
 	if err == nil && settings.Json(keys.SolarAccYield, &pvEnergy) == nil {
-		site.fcstEnergy.Accumulated = fcstEnergy
-
+		var nok bool
 		for _, name := range site.Meters.PVMetersRef {
 			if fcst, ok := pvEnergy[name]; ok {
 				site.pvEnergy[name].Accumulated = fcst
 			} else {
-				// TODO decide auto-reset?
-				site.log.WARN.Printf("cannot restore accumulated solar yield for: %s (may need to reset solar statistics)", name)
+				nok = true
+				site.log.WARN.Printf("accumulated solar yield: cannot restore %s", name)
+			}
+		}
+
+		if !nok {
+			site.fcstEnergy.Accumulated = fcstEnergy
+			site.log.DEBUG.Printf("accumulated solar yield: restored %.3fkWh forecasted, %+v produced", fcstEnergy, pvEnergy)
+		} else {
+			// reset metrics
+			site.log.WARN.Printf("accumulated solar yield: metrics reset")
+
+			settings.Delete(keys.SolarAccForecast)
+			settings.Delete(keys.SolarAccYield)
+
+			for _, pe := range site.pvEnergy {
+				pe.Accumulated = 0
 			}
 		}
 	}
@@ -338,7 +358,11 @@ func (site *Site) restoreSettings() error {
 	return nil
 }
 
-func meterCapabilities(name string, meter interface{}) string {
+func meterCapabilities(name string, meter any) string {
+	if _, ok := meter.(api.Meter); !ok {
+		panic("not a meter: " + name)
+	}
+
 	_, power := meter.(api.Meter)
 	_, energy := meter.(api.MeterEnergy)
 	_, currents := meter.(api.PhaseCurrents)
@@ -376,12 +400,13 @@ func (site *Site) DumpConfig() {
 
 	if len(site.pvMeters) > 0 {
 		for i, pv := range site.pvMeters {
-			site.log.INFO.Println(meterCapabilities(fmt.Sprintf("pv %d", i+1), pv))
+			site.log.INFO.Println(meterCapabilities(fmt.Sprintf("pv %d", i+1), pv.Instance()))
 		}
 	}
 
 	if len(site.batteryMeters) > 0 {
-		for i, battery := range site.batteryMeters {
+		for i, dev := range site.batteryMeters {
+			battery := dev.Instance()
 			_, ok := battery.(api.Battery)
 			_, hasCapacity := battery.(api.BatteryCapacity)
 
@@ -455,16 +480,30 @@ func (site *Site) publish(key string, val interface{}) {
 	site.uiChan <- util.Param{Key: key, Val: val}
 }
 
-func (site *Site) collectMeters(key string, meters []api.Meter) []measurement {
+func (site *Site) collectMeters(key string, meters []config.Device[api.Meter]) []measurement {
 	var wg sync.WaitGroup
 	mm := make([]measurement, len(meters))
 
-	fun := func(i int, meter api.Meter) {
+	fun := func(i int, dev config.Device[api.Meter]) {
+		meter := dev.Instance()
+
 		// power
-		power, err := backoff.RetryWithData(meter.CurrentPower, bo())
+		var b bytes.Buffer
+		power, err := backoff.RetryWithData(func() (float64, error) {
+			start := time.Now()
+			f, err := meter.CurrentPower()
+			if err != nil {
+				d := time.Since(start)
+				fmt.Fprintf(&b, "%v !! %3dms %v\n", start, d.Milliseconds(), err)
+			}
+			return f, err
+		}, modbus.Backoff())
 		if err == nil {
 			site.log.DEBUG.Printf("%s %d power: %.0fW", key, i+1, power)
 		} else {
+			if b.Len() > 0 {
+				site.log.ERROR.Println("\n" + b.String())
+			}
 			site.log.ERROR.Printf("%s %d power: %v", key, i+1, err)
 		}
 
@@ -477,7 +516,10 @@ func (site *Site) collectMeters(key string, meters []api.Meter) []measurement {
 			}
 		}
 
+		props := deviceProperties(dev)
 		mm[i] = measurement{
+			Title:  props.Title,
+			Icon:   props.Icon,
 			Power:  power,
 			Energy: energy,
 		}
@@ -502,9 +544,13 @@ func (site *Site) updatePvMeters() {
 
 	mm := site.collectMeters("pv", site.pvMeters)
 
-	for i, meter := range site.pvMeters {
-		power := mm[i].Power
+	for i, dev := range site.pvMeters {
+		meter := dev.Instance()
+		if _, ok := meter.(api.Meter); !ok {
+			panic("not a meter: pv")
+		}
 
+		power := mm[i].Power
 		if power < -500 {
 			site.log.WARN.Printf("pv %d power: %.0fW is negative - check configuration if sign is correct", i+1, power)
 		}
@@ -541,7 +587,14 @@ func (site *Site) updatePvMeters() {
 	site.publish(keys.Pv, mm)
 
 	// update solar yield
-	for i, name := range site.Meters.PVMetersRef {
+	for i, dev := range site.pvMeters {
+		// use stored devices, not ui-updated instances!
+		if _, ok := dev.(config.Device[api.Meter]); !ok {
+			panic(fmt.Sprintf("not a device: pv %d", i+1))
+		}
+
+		name := dev.Config().Name
+
 		if mm[i].Energy > 0 {
 			site.pvEnergy[name].AddMeterTotal(mm[i].Energy)
 		} else {
@@ -552,6 +605,9 @@ func (site *Site) updatePvMeters() {
 	// store
 	if err := settings.SetJson(keys.SolarAccYield, site.pvEnergy); err != nil {
 		site.log.ERROR.Println("accumulated solar yield:", err)
+		for k, v := range site.pvEnergy {
+			site.log.ERROR.Printf("!! %s: %+v", k, v)
+		}
 	}
 }
 
@@ -563,7 +619,12 @@ func (site *Site) updateBatteryMeters() {
 
 	mm := site.collectMeters("battery", site.batteryMeters)
 
-	for i, meter := range site.batteryMeters {
+	for i, dev := range site.batteryMeters {
+		meter := dev.Instance()
+		if _, ok := meter.(api.Meter); !ok {
+			panic("not a meter: battery")
+		}
+
 		// battery soc and capacity
 		var batSoc, capacity float64
 		var err error
@@ -663,7 +724,7 @@ func (site *Site) updateGridMeter() error {
 
 	var mm measurement
 
-	if res, err := backoff.RetryWithData(site.gridMeter.CurrentPower, bo()); err == nil {
+	if res, err := backoff.RetryWithData(site.gridMeter.CurrentPower, modbus.Backoff()); err == nil {
 		mm.Power = res
 		site.gridPower = res
 		site.log.DEBUG.Printf("grid power: %.0fW", res)
@@ -855,14 +916,7 @@ func (site *Site) update(lp updater) {
 
 	batteryGridChargeActive := site.batteryGridChargeActive(rate)
 	site.publish(keys.BatteryGridChargeActive, batteryGridChargeActive)
-
-	if batteryMode := site.requiredBatteryMode(batteryGridChargeActive, rate); batteryMode != api.BatteryUnknown {
-		if err := site.applyBatteryMode(batteryMode); err == nil {
-			site.SetBatteryMode(batteryMode)
-		} else {
-			site.log.ERROR.Println("battery mode:", err)
-		}
-	}
+	site.updateBatteryMode(batteryGridChargeActive, rate)
 
 	if sitePower, batteryBuffered, batteryStart, err := site.sitePower(totalChargePower, flexiblePower); err == nil {
 		// ignore negative pvPower values as that means it is not an energy source but consumption
@@ -905,10 +959,10 @@ func (site *Site) prepare() {
 
 	site.publish(keys.GridConfigured, site.gridMeter != nil)
 	site.publish(keys.Grid, api.Meter(nil))
-	site.publish(keys.Pv, make([]api.Meter, len(site.pvMeters)))
-	site.publish(keys.Battery, make([]api.Meter, len(site.batteryMeters)))
-	site.publish(keys.Aux, make([]api.Meter, len(site.auxMeters)))
-	site.publish(keys.Ext, make([]api.Meter, len(site.extMeters)))
+	site.publish(keys.Pv, []api.Meter{})
+	site.publish(keys.Battery, []api.Meter{})
+	site.publish(keys.Aux, []api.Meter{})
+	site.publish(keys.Ext, []api.Meter{})
 	site.publish(keys.PrioritySoc, site.prioritySoc)
 	site.publish(keys.BufferSoc, site.bufferSoc)
 	site.publish(keys.BufferStartSoc, site.bufferStartSoc)
@@ -924,6 +978,7 @@ func (site *Site) prepare() {
 	}
 
 	site.publishVehicles()
+	site.publishTariffs(0, 0)
 	vehicle.Publish = site.publishVehicles
 }
 
@@ -967,7 +1022,7 @@ func (site *Site) Prepare(uiChan chan<- util.Param, pushChan chan<- push.Event) 
 			}
 		}(id)
 
-		lp.Prepare(lpUIChan, lpPushChan, site.lpUpdateChan)
+		lp.Prepare(site, lpUIChan, lpPushChan, site.lpUpdateChan)
 	}
 }
 
