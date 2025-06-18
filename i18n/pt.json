@@ -113,6 +113,9 @@
       "batteryStorage": "“Bateria”",
       "solarSystem": "Sistema fotovoltaico"
     },
+    "editor": {
+      "loading": "A carregar editor YAML…"
+    },
     "eebus": {
       "description": "Configuração que permite o evcc comunicar com outros dispositivos EEBus.",
       "title": "EEBus"
@@ -130,6 +133,8 @@
     },
     "general": {
       "cancel": "Cancelar",
+      "customHelp": "Criar um dispositivo definido pelo utilizador utilizando o sistema de plugins do evcc.",
+      "customOption": "Dispositivo definido pelo utilizador",
       "delete": "Apagar",
       "docsLink": "Ver documentação.",
       "experimental": "Experimental",
@@ -155,6 +160,9 @@
       "description": "Conectar evcc a outro sistema de gestão de energia doméstica.",
       "title": "HEMS"
     },
+    "icon": {
+      "change": "alterar"
+    },
     "influx": {
       "description": "Escreve dados de carregamento e outras métricas no InfluxDB. Use o Grafana ou outras ferramentas para visualizar os dados.",
       "descriptionToken": "Verifique a documentação do InfluxDB para aprender a criar uma. https://docs.influxdata.com/influxdb/v2/admin/",
@@ -175,7 +183,7 @@
       "addCharger": "Adicionar Carregador",
       "addMeter": "Adicionar um Contador de Carregador dedicado",
       "cancel": "Cancelar",
-      "chargerError": "É necessário configurar um Carregador EV",
+      "chargerError": "É necessário configurar um Carregador EV.",
       "chargerLabel": "Carregador",
       "chargerPower11kw": "11 kW",
       "chargerPower11kwHelp": "Utilização de uma gama de correntes de 6 a 16 A.",
@@ -185,6 +193,7 @@
       "chargerPowerCustomHelp": "Definir um intervalo de Correntes personalizado.",
       "chargerTypeLabel": "Tipo de Carregador",
       "chargingTitle": "A Carregar",
+      "circuitHelp": "Atribuição de gestão de carga para garantir que os limites de potência e corrente não são excedidos.",
       "circuitLabel": "Circuito",
       "circuitUnassigned": "não atribuído",
       "defaultModeHelp": "Modo de carregamento ao ligar o veículo.",
@@ -255,6 +264,7 @@
       "addVehicle": "Adicionar veículo",
       "configured": "configurado",
       "edit": "editar",
+      "loadpointRequired": "Tem de ser configurado pelo menos um ponto de carga.",
       "name": "Nome",
       "title": "Configuração",
       "unconfigured": "não configurado",
@@ -268,6 +278,7 @@
     "meter": {
       "cancel": "Cancelar",
       "delete": "Apagar",
+      "generic": "Integrações genéricas",
       "option": {
         "aux": "Adicionar aparelho autorregulável",
         "battery": "Adicionar Contador de bateria",
@@ -275,9 +286,30 @@
         "pv": "Adicionar Contador solar"
       },
       "save": "Guardar",
+      "specific": "Integrações específicas",
       "template": "Fabricante",
       "titleChoice": "O que quer adicionar?",
       "validateSave": "Validar e guardar"
+    },
+    "modbus": {
+      "baudrate": "Baud rate",
+      "comset": "ComSet",
+      "connection": "Ligação Modbus",
+      "connectionHintSerial": "O dispositivo está ligado diretamente ao evcc via RS485.",
+      "connectionHintTcpip": "O dispositivo está acessível ao evcc via LAN/WIFI.",
+      "connectionValueSerial": "Serial / USB",
+      "connectionValueTcpip": "Rede Informática",
+      "device": "Nome do dispositivo",
+      "deviceHint": "Exemplo: /dev/ttyUSB0",
+      "host": "Endereço IP ou hostname",
+      "hostHint": "Exemplo: 192.0.2.2",
+      "id": "Modbus ID",
+      "port": "Porta",
+      "protocol": "Protocolo Modbus",
+      "protocolHintRtu": "Ligação através de adaptador RS485 / Ethernet sem tradução de protocolo.",
+      "protocolHintTcp": "O dispositivo tem suporte LAN/WIFI nativo ou está ligado a um adaptador RS485 / Ethernet com tradução de protocolo.",
+      "protocolValueRtu": "RTU",
+      "protocolValueTcp": "TCP"
     },
     "modbusproxy": {
       "description": "Permitir que vários clientes acedam ao mesmo dispositivo Modbus.",
@@ -360,8 +392,8 @@
       "restart": "Reiniciar",
       "restartRequiredDescription": "Por favor reinicie para aplicar as alterações.",
       "restartRequiredMessage": "Configuração alterada.",
-      "restartingDescription": "Espere por favor...",
-      "restartingMessage": "evcc a reiniciar"
+      "restartingDescription": "Espere por favor…",
+      "restartingMessage": "evcc a reiniciar."
     },
     "tariffs": {
       "description": "Defina as suas tarifas de energia para calcular os custos das suas sessões de carregamento.",
@@ -375,7 +407,7 @@
     "validation": {
       "failed": "falhou",
       "label": "Status",
-      "running": "a validar...",
+      "running": "a validar…",
       "success": "concluído com sucesso",
       "unknown": "desconhecido",
       "validate": "validar"
@@ -396,6 +428,7 @@
       "minimumCurrent": "Corrente mínima",
       "minimumCurrentHelp": "Somente ir abaixo de 6A se souber o que está a fazer.",
       "online": "Veículos com API online",
+      "primary": "Integrações genéricas",
       "priority": "Prioridade",
       "priorityHelp": "Uma prioridade mais elevada significa que este veículo tem acesso preferencial ao excedente solar.",
       "save": "Guardar",
@@ -416,7 +449,7 @@
       "greenShareSub2": "solar e bateria doméstica",
       "power": "Energia de carga",
       "powerSub1": "{activeClients} de {totalClients} utilizadores",
-      "powerSub2": "a carregar...",
+      "powerSub2": "a carregar…",
       "tabTitle": "Comunidade em tempo real"
     },
     "savings": {
@@ -472,7 +505,7 @@
       "modalTitle": "Nova versão disponível",
       "modalUpdate": "Instalar",
       "modalUpdateNow": "Instalar agora",
-      "modalUpdateStarted": "Iniciando a nova versão do evcc...",
+      "modalUpdateStarted": "Iniciando a nova versão do evcc…",
       "modalUpdateStatusStart": "Instalação iniciada:"
     }
   },
@@ -568,6 +601,11 @@
       "modalTitle": "Plano de carga",
       "none": "nenhum",
       "planNumber": "Plano {número}",
+      "preconditionDescription": "Carregar {duration} antes da partida para pré-condicionamento da bateria.",
+      "preconditionLong": "Carga tardia",
+      "preconditionOptionAll": "tudo",
+      "preconditionOptionNo": "não",
+      "preconditionShort": "Tarde",
       "remove": "Apagar",
       "repeating": "recorrente",
       "repeatingPlans": "Repetição de planos",
@@ -599,10 +637,10 @@
       "selfConsumption": "Autoconsumo"
     },
     "heatingStatus": {
-      "charging": "Aquecendo...",
+      "charging": "A aquecer…",
       "connected": "Standby.",
       "vehicleLimit": "Limite do aquecedor",
-      "waitForVehicle": "Pronto. À espera do aquecedor..."
+      "waitForVehicle": "Pronto. À espera do aquecedor…"
     },
     "loadpoint": {
       "avgPrice": "Preço",
@@ -610,6 +648,7 @@
       "co2": "CO₂",
       "duration": "Duração",
       "fallbackName": "Posto de Carregamento",
+      "finished": "Tempo de finalização",
       "power": "Potência",
       "price": "Custo",
       "remaining": "Tempo restante",
@@ -714,7 +753,7 @@
     "vehicle": {
       "addVehicle": "Adicionar veículo",
       "changeVehicle": "Trocar veículo",
-      "detectionActive": "A detectar veículo...",
+      "detectionActive": "A detectar veículo…",
       "fallbackName": "Veículo",
       "moreActions": "Mais ações",
       "none": "Nenhum veículo",
@@ -728,7 +767,7 @@
     "vehicleStatus": {
       "awaitingAuthorization": "À espera de autorização.",
       "batteryBoost": "Boost da bateria ativo.",
-      "charging": "A carregar...",
+      "charging": "A carregar…",
       "cheapEnergyCharging": "Energia barata disponível.",
       "cheapEnergyNextStart": "Energia barata em {duration}.",
       "cheapEnergySet": "Limite de preço definido.",
@@ -740,17 +779,17 @@
       "disconnectRequired": "Sessão terminada. Por favor, volte a ligar-se.",
       "disconnected": "Desligado.",
       "finished": "Concluído.",
-      "minCharge": "Recarga mínima até {soc}",
+      "minCharge": "Recarga mínima até {soc}.",
       "pvDisable": "Excedente insuficiente. Pausa em breve.",
       "pvEnable": "Excesso disponível. Carregamento em breve.",
       "scale1p": "Reduzindo para carregamento monofásico em breve.",
       "scale3p": "Aumentando para carregamento trifásico em breve.",
       "targetChargeActive": "Plano de carregamento ativo. Fim estimado em {duration}.",
       "targetChargePlanned": "O plano de carregamento começa em {duration}.",
-      "targetChargeWaitForVehicle": "Plano de carregamento pronto. À espera do veículo...",
+      "targetChargeWaitForVehicle": "Plano de carregamento pronto. A aguardar veículo…",
       "vehicleLimit": "Limite dos veículos",
       "vehicleLimitReached": "Limite de veículo atingido.",
-      "waitForVehicle": "Pronto. À espera do veículo...",
+      "waitForVehicle": "Pronto. A aguardar veículo…",
       "welcome": "Carga inicial curta para confirmar a ligação."
     },
     "vehicles": "Estacionamento",
@@ -835,10 +874,9 @@
       "solarpercentage": "Solar (%)",
       "vehicle": "Veículo"
     },
-    "csvMonth": "Download {month} CSV",
+    "csvPeriod": "Download {period} CSV",
     "csvTotal": "Download tudo CSV",
     "date": "Início",
-    "downloadCsv": "Download como CSV",
     "energy": "Carregado",
     "filter": {
       "allLoadpoints": "todos os postos de carregamento",
@@ -904,6 +942,11 @@
       "dark": "escuro",
       "label": "Estilo",
       "light": "claro"
+    },
+    "time": {
+      "12h": "12 horas",
+      "24h": "24 horas",
+      "label": "Formato da hora"
     },
     "title": "Interface de utilizador",
     "unit": {

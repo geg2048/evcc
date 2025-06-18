@@ -66,6 +66,21 @@ func (lp *Loadpoint) GetCircuitRef() string {
 	return lp.CircuitRef
 }
 
+// SetCircuitRef sets the loadpoint circuit
+func (lp *Loadpoint) SetCircuitRef(ref string) {
+	if !lp.isConfigurable() {
+		lp.log.ERROR.Println("cannot set circuit ref: not configurable")
+		return
+	}
+
+	lp.log.DEBUG.Println("set circuit ref:", ref)
+
+	lp.Lock()
+	defer lp.Unlock()
+	lp.CircuitRef = ref
+	lp.settings.SetString(keys.Circuit, ref)
+}
+
 // GetDefaultVehicleRef returns the loadpoint default vehicle
 func (lp *Loadpoint) GetDefaultVehicleRef() string {
 	lp.RLock()
@@ -79,6 +94,8 @@ func (lp *Loadpoint) SetDefaultVehicleRef(ref string) {
 		lp.log.ERROR.Println("cannot set default vehicle ref: not configurable")
 		return
 	}
+
+	lp.log.DEBUG.Println("set default vehicle ref:", ref)
 
 	lp.Lock()
 	defer lp.Unlock()
@@ -253,11 +270,6 @@ func (lp *Loadpoint) SetPhasesConfigured(phases int) error {
 
 	lp.Lock()
 	lp.setPhasesConfigured(phases)
-
-	// apply immediately if not 1p3p
-	if !lp.hasPhaseSwitching() {
-		lp.setPhases(phases)
-	}
 	lp.Unlock()
 
 	lp.requestUpdate()
@@ -351,6 +363,7 @@ func (lp *Loadpoint) setPlanEnergy(finishAt time.Time, precondition time.Duratio
 	}
 
 	lp.planTime = finishAt
+	lp.planPrecondition = precondition
 	lp.publish(keys.PlanTime, finishAt)
 	lp.publish(keys.PlanPrecondition, precondition)
 	lp.settings.SetTime(keys.PlanTime, finishAt)
@@ -687,20 +700,6 @@ func (lp *Loadpoint) SetMaxCurrent(current float64) error {
 	}
 
 	return nil
-}
-
-// GetMinPower returns the min loadpoint power for a single phase
-func (lp *Loadpoint) GetMinPower() float64 {
-	lp.RLock()
-	defer lp.RUnlock()
-	return Voltage * lp.effectiveMinCurrent()
-}
-
-// GetMaxPower returns the max loadpoint power taking vehicle capabilities and phase scaling into account
-func (lp *Loadpoint) GetMaxPower() float64 {
-	lp.RLock()
-	defer lp.RUnlock()
-	return Voltage * lp.effectiveMaxCurrent() * float64(lp.maxActivePhases())
 }
 
 // IsFastChargingActive indicates if fast charging with maximum power is active
