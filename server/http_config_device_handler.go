@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 
 	"dario.cat/mergo"
@@ -199,14 +200,22 @@ func deviceConfigHandler(w http.ResponseWriter, r *http.Request) {
 	jsonWrite(w, res)
 }
 
-func deviceStatus[T any](name string, h config.Handler[T]) (T, error) {
+func deviceStatus[T comparable](name string, h config.Handler[T]) (T, error) {
+	var zero T
+
 	dev, err := h.ByName(name)
 	if err != nil {
-		var zero T
 		return zero, err
 	}
 
-	return dev.Instance(), nil
+	instance := dev.Instance()
+
+	// check if device instance is nil (https://github.com/golang/go/issues/46320#issuecomment-965970859)
+	if rv := reflect.ValueOf(&instance); rv.Elem().IsZero() || rv.Elem().IsNil() {
+		return zero, fmt.Errorf("instance %s not initialized", name)
+	}
+
+	return instance, nil
 }
 
 // deviceStatusHandler returns the device test status by class
@@ -245,9 +254,9 @@ func deviceStatusHandler(w http.ResponseWriter, r *http.Request) {
 	jsonWrite(w, testInstance(instance))
 }
 
-func newDevice[T any](ctx context.Context, class templates.Class, req configReq, newFromConf newFromConfFunc[T], h config.Handler[T]) (*config.Config, error) {
+func newDevice[T any](ctx context.Context, class templates.Class, req configReq, newFromConf newFromConfFunc[T], h config.Handler[T], force bool) (*config.Config, error) {
 	instance, err := newFromConf(ctx, req.Type, req.Other)
-	if err != nil {
+	if err != nil && !force {
 		return nil, err
 	}
 
@@ -278,20 +287,22 @@ func newDeviceHandler(w http.ResponseWriter, r *http.Request) {
 	var conf *config.Config
 	ctx, cancel, done := startDeviceTimeout()
 
+	force := r.URL.Query().Get("force") == "true"
+
 	switch class {
 	case templates.Charger:
-		conf, err = newDevice(ctx, class, req, charger.NewFromConfig, config.Chargers())
+		conf, err = newDevice(ctx, class, req, charger.NewFromConfig, config.Chargers(), force)
 
 	case templates.Meter:
-		conf, err = newDevice(ctx, class, req, meter.NewFromConfig, config.Meters())
+		conf, err = newDevice(ctx, class, req, meter.NewFromConfig, config.Meters(), force)
 
 	case templates.Vehicle:
-		conf, err = newDevice(ctx, class, req, vehicle.NewFromConfig, config.Vehicles())
+		conf, err = newDevice(ctx, class, req, vehicle.NewFromConfig, config.Vehicles(), force)
 
 	case templates.Circuit:
 		conf, err = newDevice(ctx, class, req, func(ctx context.Context, _ string, other map[string]interface{}) (api.Circuit, error) {
 			return circuit.NewFromConfig(ctx, util.NewLogger("circuit"), other)
-		}, config.Circuits())
+		}, config.Circuits(), force)
 	}
 
 	if err != nil {
@@ -316,10 +327,13 @@ func newDeviceHandler(w http.ResponseWriter, r *http.Request) {
 	jsonWrite(w, res)
 }
 
-func updateDevice[T any](ctx context.Context, id int, class templates.Class, req configReq, newFromConf newFromConfFunc[T], h config.Handler[T]) error {
+func updateDevice[T any](ctx context.Context, id int, class templates.Class, req configReq, newFromConf newFromConfFunc[T], h config.Handler[T], force bool) error {
 	dev, instance, merged, err := deviceInstanceFromMergedConfig(ctx, id, class, req, newFromConf, h)
 	if err != nil {
-		return err
+		// allow force-updating if merged config exists
+		if !force || merged == nil {
+			return err
+		}
 	}
 
 	configurable, ok := dev.(config.ConfigurableDevice[T])
@@ -354,20 +368,22 @@ func updateDeviceHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel, done := startDeviceTimeout()
 
+	force := r.URL.Query().Get("force") == "true"
+
 	switch class {
 	case templates.Charger:
-		err = updateDevice(ctx, id, class, req, charger.NewFromConfig, config.Chargers())
+		err = updateDevice(ctx, id, class, req, charger.NewFromConfig, config.Chargers(), force)
 
 	case templates.Meter:
-		err = updateDevice(ctx, id, class, req, meter.NewFromConfig, config.Meters())
+		err = updateDevice(ctx, id, class, req, meter.NewFromConfig, config.Meters(), force)
 
 	case templates.Vehicle:
-		err = updateDevice(ctx, id, class, req, vehicle.NewFromConfig, config.Vehicles())
+		err = updateDevice(ctx, id, class, req, vehicle.NewFromConfig, config.Vehicles(), force)
 
 	case templates.Circuit:
 		err = updateDevice(ctx, id, class, req, func(ctx context.Context, _ string, other map[string]interface{}) (api.Circuit, error) {
 			return circuit.NewFromConfig(ctx, util.NewLogger("circuit"), other)
-		}, config.Circuits())
+		}, config.Circuits(), force)
 	}
 
 	setConfigDirty()
@@ -592,8 +608,9 @@ func testConfigHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// prevent context from being cancelled
+	// prevent context from being cancelled during test
 	close(done)
+	defer cancel()
 
 	jsonWrite(w, testInstance(instance))
 }

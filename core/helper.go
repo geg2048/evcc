@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 
+	"github.com/evcc-io/evcc/api"
 	"github.com/evcc-io/evcc/util/config"
 )
 
@@ -52,4 +53,32 @@ func deviceProperties[T any](dev config.Device[T]) config.Properties {
 		return d.Properties()
 	}
 	return config.Properties{}
+}
+
+// deviceTitleOrName returns device title or name
+func deviceTitleOrName[T any](dev config.Device[T]) string {
+	if d, ok := dev.(config.ConfigurableDevice[T]); ok {
+		if title := d.Properties().Title; title != "" {
+			return title
+		}
+	}
+	return dev.Config().Name
+}
+
+// circuitMaxPower returns a circuits power limit
+func circuitMaxPower(circuit api.Circuit) float64 {
+	if circuit == nil {
+		return 0
+	}
+
+	return circuit.GetMaxPower()
+}
+
+// circuitDimmed returns a circuits dim status
+func circuitDimmed(circuit api.Circuit) bool {
+	if circuit == nil {
+		return false
+	}
+
+	return circuit.Dimmed()
 }

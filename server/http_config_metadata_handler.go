@@ -7,6 +7,7 @@ import (
 
 	"github.com/evcc-io/evcc/util/templates"
 	"github.com/gorilla/mux"
+	"github.com/samber/lo"
 )
 
 var supportedLanguages = []string{"en", "de"}
@@ -34,13 +35,9 @@ func templatesHandler(w http.ResponseWriter, r *http.Request) {
 
 	// filter deprecated properties
 	filterParams := func(t templates.Template) templates.Template {
-		params := make([]templates.Param, 0, len(t.Params))
-		for _, p := range t.Params {
-			if p.Deprecated == nil || !*p.Deprecated {
-				params = append(params, p)
-			}
-		}
-		t.Params = params
+		t.Params = lo.Filter(t.Params, func(p templates.Param, _ int) bool {
+			return !p.IsDeprecated()
+		})
 		return t
 	}
 
