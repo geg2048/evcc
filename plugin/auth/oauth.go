@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -19,39 +21,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type OAuth struct {
-	mu      sync.Mutex
-	log     *util.Logger
-	oc      *oauth2.Config
-	token   *oauth2.Token
-	subject string
-	cv      string
-	ctx     context.Context
-	onlineC chan<- bool
-
-	deviceFlow     bool
-	tokenRetriever func(string, *oauth2.Token) error
-	tokenStorer    func(*oauth2.Token) any
-}
-
-type oauthOption func(*OAuth)
-
-func WithOauthDeviceFlowOption() func(o *OAuth) {
-	return func(o *OAuth) {
-		o.deviceFlow = true
-	}
-}
-
-func WithTokenStorerOption(ts func(*oauth2.Token) any) func(o *OAuth) {
-	return func(o *OAuth) {
-		o.tokenStorer = ts
-	}
-}
-
-func WithTokenRetrieverOption(tr func(string, *oauth2.Token) error) func(o *OAuth) {
-	return func(o *OAuth) {
-		o.tokenRetriever = tr
-	}
+func init() {
+	registry.AddCtx("oauth", NewOauthFromConfig)
 }
 
 var (
@@ -67,13 +38,26 @@ func addInstance(subject string, identity *OAuth) {
 	identities[subject] = identity
 }
 
-func init() {
-	registry.AddCtx("oauth", NewOauthFromConfig)
+type OAuth struct {
+	mu      sync.Mutex
+	log     *util.Logger
+	oc      *oauth2.Config
+	token   *oauth2.Token
+	name    string
+	devices []string
+	subject string
+	cv      string
+	ctx     context.Context
+	onlineC chan<- bool
+
+	deviceFlow     bool
+	tokenRetriever func(string, *oauth2.Token) error
+	tokenStorer    func(*oauth2.Token) any
 }
 
 func NewOauthFromConfig(ctx context.Context, other map[string]any) (oauth2.TokenSource, error) {
 	var cc struct {
-		Name          string
+		Name, Device  string
 		oauth2.Config `mapstructure:",squash"`
 	}
 
@@ -81,12 +65,13 @@ func NewOauthFromConfig(ctx context.Context, other map[string]any) (oauth2.Token
 		return nil, err
 	}
 
-	return NewOauth(ctx, cc.Name, &cc.Config)
+	return NewOauth(ctx, cc.Name, cc.Device, &cc.Config)
 }
 
 var _ api.AuthProvider = (*OAuth)(nil)
+var _ oauth2.TokenSource = (*OAuth)(nil)
 
-func NewOauth(ctx context.Context, name string, oc *oauth2.Config, opts ...oauthOption) (oauth2.TokenSource, error) {
+func NewOauth(ctx context.Context, name, device string, oc *oauth2.Config, opts ...func(o *OAuth)) (*OAuth, error) {
 	if name == "" {
 		return nil, errors.New("instance name must not be empty")
 	}
@@ -97,28 +82,36 @@ func NewOauth(ctx context.Context, name string, oc *oauth2.Config, opts ...oauth
 	// hash oauth2 config
 	h := sha256.Sum256(fmt.Append(nil, oc))
 	hash := hex.EncodeToString(h[:])[:8]
-	subject := name + " (" + hash + ")"
+	subject := oc.ClientID + "-" + hash
 
 	// reuse instance
 	if instance := getInstance(subject); instance != nil {
+		if device != "" && !slices.Contains(instance.devices, device) {
+			instance.devices = append(instance.devices, device)
+		}
 		return instance, nil
 	}
 
 	log := util.NewLogger("oauth-" + hash)
 
-	if ctx.Value(oauth2.HTTPClient) == nil {
+	if client, ok := ctx.Value(oauth2.HTTPClient).(*http.Client); client == nil || !ok {
 		ctx = context.WithValue(ctx, oauth2.HTTPClient, request.NewClient(log))
 	}
 
 	o := &OAuth{
-		subject: subject,
 		oc:      oc,
 		log:     log,
 		ctx:     ctx,
+		subject: subject,
+		name:    name,
 	}
 
 	for _, opt := range opts {
 		opt(o)
+	}
+
+	if device != "" {
+		o.devices = []string{device}
 	}
 
 	// load token from db
@@ -167,7 +160,7 @@ func (o *OAuth) Token() (*oauth2.Token, error) {
 	defer o.mu.Unlock()
 
 	if o.token == nil {
-		return nil, api.ErrMissingToken
+		return nil, api.LoginRequiredError(o.subject)
 	}
 
 	if o.token.Valid() {
@@ -177,7 +170,8 @@ func (o *OAuth) Token() (*oauth2.Token, error) {
 	token, err := o.oc.TokenSource(o.ctx, o.token).Token()
 	if err != nil {
 		// force logout
-		if strings.Contains(err.Error(), "invalid_grant") && settings.Exists(o.subject) {
+		if strings.Contains(err.Error(), "invalid_") && settings.Exists(o.subject) {
+			o.token = nil
 			o.onlineC <- false
 			settings.Delete(o.subject)
 		}
@@ -278,7 +272,6 @@ func (o *OAuth) Logout() error {
 	defer o.mu.Unlock()
 
 	o.token = nil
-
 	o.onlineC <- false
 
 	return nil
@@ -286,7 +279,10 @@ func (o *OAuth) Logout() error {
 
 // DisplayName implements api.AuthProvider.
 func (o *OAuth) DisplayName() string {
-	return o.subject
+	if len(o.devices) > 0 {
+		return fmt.Sprintf("%s (%s)", o.name, strings.Join(o.devices, ", "))
+	}
+	return o.name
 }
 
 // Authenticated implements api.AuthProvider.

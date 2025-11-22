@@ -163,7 +163,7 @@ export default defineComponent({
 					order: active ? 0 : 1,
 				});
 			}
-			if (this.gridSlots.length > 0) {
+			if (this.gridSlots && this.gridSlots.length > 0) {
 				const active = this.selected === ForecastType.Price;
 				const color = active ? colors.price : colors.border;
 				datasets.push({
@@ -184,7 +184,7 @@ export default defineComponent({
 					order: active ? 0 : 1,
 				});
 			}
-			if (this.co2Slots.length > 0) {
+			if (this.co2Slots && this.co2Slots.length > 0) {
 				const active = this.selected === ForecastType.Co2;
 				const color = active ? colors.co2 : colors.border;
 				datasets.push({
@@ -427,20 +427,19 @@ export default defineComponent({
 			this.startDate = now;
 		},
 		filterSlots(slots: ForecastSlot[] = []) {
+			if (!slots) {
+				return undefined;
+			}
+
 			return slots.filter(
 				(slot) =>
 					new Date(slot.end) >= this.startDate && new Date(slot.start) <= this.endDate
 			);
 		},
 		filterEntries(entries: TimeseriesEntry[] = []) {
-			// include 1 hour before and after
-			const start = new Date(this.startDate);
-			start.setHours(start.getHours() - 1);
-			const end = new Date(this.endDate);
-			end.setHours(end.getHours() + 1);
-
 			return entries.filter(
-				(entry) => new Date(entry.ts) >= start && new Date(entry.ts) <= end
+				(entry) =>
+					new Date(entry.ts) >= this.startDate && new Date(entry.ts) <= this.endDate
 			);
 		},
 		onMouseLeave() {

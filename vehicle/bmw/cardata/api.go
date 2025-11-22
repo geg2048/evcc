@@ -29,13 +29,15 @@ var requiredKeys = []string{
 	"vehicle.cabin.hvac.preconditioning.status.comfortState",
 	"vehicle.drivetrain.batteryManagement.header",
 	"vehicle.drivetrain.electricEngine.charging.hvStatus",
+	"vehicle.drivetrain.electricEngine.charging.status",
 	"vehicle.drivetrain.electricEngine.charging.timeRemaining",
 	"vehicle.drivetrain.electricEngine.kombiRemainingElectricRange",
 	"vehicle.powertrain.electric.battery.stateOfCharge.target",
+	"vehicle.vehicle.preConditioning.activity",
 	"vehicle.vehicle.travelledDistance",
 }
 
-const requiredVersion = "v2"
+const requiredVersion = "v3"
 
 type API struct {
 	*request.Helper
@@ -95,8 +97,8 @@ func (v *API) DeleteContainer(id string) error {
 	return v.DoJSON(req, &res)
 }
 
-func (v *API) GetTelematics(vin, container string) (TelematicData, error) {
-	var res TelematicData
+func (v *API) GetTelematics(vin, container string) (ContainerContents, error) {
+	var res ContainerContents
 	uri := fmt.Sprintf(ApiURL+"/customers/vehicles/%s/telematicData?containerId=%s", vin, container)
 	err := v.GetJSON(uri, &res)
 	return res, err

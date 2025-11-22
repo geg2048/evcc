@@ -12,6 +12,7 @@ import (
 	"github.com/evcc-io/evcc/util"
 	"github.com/evcc-io/evcc/util/request"
 	"github.com/evcc-io/evcc/util/transport"
+	"github.com/samber/lo"
 )
 
 // Connection represents a Home Assistant API connection
@@ -21,18 +22,17 @@ type Connection struct {
 }
 
 // NewConnection creates a new Home Assistant connection
-func NewConnection(baseURL, token string) (*Connection, error) {
-	if baseURL == "" {
-		return nil, errors.New("missing baseURL")
+func NewConnection(log *util.Logger, uri, token string) (*Connection, error) {
+	if uri == "" {
+		return nil, errors.New("missing uri")
 	}
 	if token == "" {
 		return nil, errors.New("missing token")
 	}
 
-	log := util.NewLogger("homeassistant")
 	c := &Connection{
 		Helper: request.NewHelper(log.Redact(token)),
-		uri:    strings.TrimSuffix(baseURL, "/"),
+		uri:    util.DefaultScheme(strings.TrimSuffix(uri, "/"), "http"),
 	}
 
 	// Set up authentication headers
@@ -49,8 +49,8 @@ func NewConnection(baseURL, token string) (*Connection, error) {
 
 // StateResponse represents a Home Assistant entity state
 type StateResponse struct {
-	State      string                 `json:"state"`
-	Attributes map[string]interface{} `json:"attributes"`
+	State      string         `json:"state"`
+	Attributes map[string]any `json:"attributes"`
 }
 
 // GetState retrieves the state of an entity
@@ -67,6 +67,21 @@ func (c *Connection) GetState(entity string) (string, error) {
 	}
 
 	return res.State, nil
+}
+
+// GetIntState retrieves the state of an entity as int64
+func (c *Connection) GetIntState(entity string) (int64, error) {
+	state, err := c.GetState(entity)
+	if err != nil {
+		return 0, err
+	}
+
+	value, err := strconv.ParseInt(state, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid numeric state '%s' for entity %s: %w", state, entity, err)
+	}
+
+	return value, nil
 }
 
 // GetFloatState retrieves the state of an entity as float64
@@ -102,8 +117,58 @@ func (c *Connection) GetBoolState(entity string) (bool, error) {
 	}
 }
 
+// chargeStatusMap maps Home Assistant states to EVCC charge status
+var chargeStatusMap = map[string]api.ChargeStatus{
+	// Status C - Charging
+	"c":        api.StatusC,
+	"charging": api.StatusC,
+	"on":       api.StatusC,
+	"true":     api.StatusC,
+	"active":   api.StatusC,
+	"1":        api.StatusC,
+
+	// Status B - Connected/Ready
+	"b":                  api.StatusB,
+	"connected":          api.StatusB,
+	"ready":              api.StatusB,
+	"plugged":            api.StatusB,
+	"charging_completed": api.StatusB,
+	"initialising":       api.StatusB,
+	"preparing":          api.StatusB,
+	"2":                  api.StatusB,
+	"no_power":           api.StatusB,
+	"complete":           api.StatusB,
+	"stopped":            api.StatusB,
+	"starting":           api.StatusB,
+
+	// Status A - Disconnected
+	"a":                   api.StatusA,
+	"disconnected":        api.StatusA,
+	"off":                 api.StatusA,
+	"none":                api.StatusA,
+	"unavailable":         api.StatusA,
+	"unknown":             api.StatusA,
+	"notreadyforcharging": api.StatusA,
+	"not_plugged":         api.StatusA,
+	"0":                   api.StatusA,
+}
+
+// GetChargeStatus maps Home Assistant states to api.ChargeStatus
+func (c *Connection) GetChargeStatus(entity string) (api.ChargeStatus, error) {
+	state, err := c.GetState(entity)
+	if err != nil {
+		return api.StatusNone, err
+	}
+
+	if status, ok := chargeStatusMap[strings.ToLower(strings.TrimSpace(state))]; ok {
+		return status, nil
+	}
+
+	return api.StatusNone, fmt.Errorf("unknown charge status: %s", state)
+}
+
 // CallService calls a Home Assistant service
-func (c *Connection) CallService(domain, service string, data map[string]interface{}) error {
+func (c *Connection) CallService(domain, service string, data map[string]any) error {
 	uri := fmt.Sprintf("%s/api/services/%s/%s", c.uri, domain, service)
 
 	req, err := request.New(http.MethodPost, uri, request.MarshalJSON(data), request.JSONEncoding)
@@ -128,7 +193,7 @@ func (c *Connection) CallSwitchService(entity string, turnOn bool) error {
 		service = "turn_on"
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"entity_id": entity,
 	}
 
@@ -137,7 +202,7 @@ func (c *Connection) CallSwitchService(entity string, turnOn bool) error {
 
 // CallNumberService is a convenience method for setting number entity values
 func (c *Connection) CallNumberService(entity string, value float64) error {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"entity_id": entity,
 		"value":     value,
 	}
@@ -145,8 +210,8 @@ func (c *Connection) CallNumberService(entity string, value float64) error {
 	return c.CallService("number", "set_value", data)
 }
 
-// GetPhaseStates retrieves three phase values (currents, voltages, etc.)
-func (c *Connection) GetPhaseStates(entities []string) (float64, float64, float64, error) {
+// GetPhaseFloatStates retrieves three phase values (currents, voltages, etc.)
+func (c *Connection) GetPhaseFloatStates(entities []string) (float64, float64, float64, error) {
 	if len(entities) != 3 {
 		return 0, 0, 0, errors.New("invalid phase entities")
 	}
@@ -170,7 +235,11 @@ func (c *Connection) GetPhaseStates(entities []string) (float64, float64, float6
 }
 
 // ValidatePhaseEntities validates that phase entity arrays contain 1 or 3 entities
-func ValidatePhaseEntities(entities []string) ([]string, error) {
+func ValidatePhaseEntities(phases []string) ([]string, error) {
+	entities := lo.FilterMap(phases, func(s string, _ int) (string, bool) {
+		t := strings.TrimSpace(s)
+		return t, t != ""
+	})
 	switch len(entities) {
 	case 0:
 		return nil, nil
@@ -179,46 +248,4 @@ func ValidatePhaseEntities(entities []string) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("must contain three-phase entities (L1, L2, L3), got %d", len(entities))
 	}
-}
-
-// chargeStatusMap maps Home Assistant states to EVCC charge status
-var chargeStatusMap = map[string]api.ChargeStatus{
-	// Status C - Charging
-	"c":        api.StatusC,
-	"charging": api.StatusC,
-	"on":       api.StatusC,
-	"true":     api.StatusC,
-	"active":   api.StatusC,
-	"1":        api.StatusC,
-
-	// Status B - Connected/Ready
-	"b":                  api.StatusB,
-	"connected":          api.StatusB,
-	"ready":              api.StatusB,
-	"plugged":            api.StatusB,
-	"charging_completed": api.StatusB,
-	"initialising":       api.StatusB,
-	"preparing":          api.StatusB,
-	"2":                  api.StatusB,
-
-	// Status A - Disconnected
-	"a":                   api.StatusA,
-	"disconnected":        api.StatusA,
-	"off":                 api.StatusA,
-	"none":                api.StatusA,
-	"unavailable":         api.StatusA,
-	"unknown":             api.StatusA,
-	"notreadyforcharging": api.StatusA,
-	"not_plugged":         api.StatusA,
-	"0":                   api.StatusA,
-}
-
-// ParseChargeStatus maps Home Assistant states to EVCC charge status
-func ParseChargeStatus(state string) (api.ChargeStatus, error) {
-	normalized := strings.ToLower(strings.TrimSpace(state))
-	if status, ok := chargeStatusMap[normalized]; ok {
-		return status, nil
-	}
-
-	return api.StatusNone, fmt.Errorf("unknown charge status: %s", state)
 }

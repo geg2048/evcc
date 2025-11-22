@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24.0"
+          go-version-file: go.mod
           cache: false # avoid cache thrashing
         id: go
 
@@ -63,7 +63,7 @@ jobs:
             ${{ runner.os }}-go-build-
             ${{ runner.os }}-go-
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -127,7 +127,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          version: v2.5.0
           args: --timeout 5m
 
   ui:
@@ -137,7 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -184,7 +184,7 @@ jobs:
             ${{ runner.os }}-go-integration-
             ${{ runner.os }}-go-
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -220,7 +220,7 @@ jobs:
         env:
           TZ: Europe/Berlin
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: ${{ !cancelled() }}
         with:
           name: playwright-report

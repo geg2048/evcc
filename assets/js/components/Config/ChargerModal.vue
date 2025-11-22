@@ -8,6 +8,7 @@
 		:modal-title="modalTitle"
 		:provide-template-options="provideTemplateOptions"
 		:initial-values="initialValues"
+		:is-type-deprecated="isTypeDeprecated"
 		:is-yaml-input-type="isYamlInput"
 		:transform-api-data="transformApiData"
 		:filter-template-params="filterTemplateParams"
@@ -54,7 +55,7 @@ import heatpumpYaml from "./defaultYaml/heatpump.yaml?raw";
 import switchsocketHeaterYaml from "./defaultYaml/switchsocketHeater.yaml?raw";
 import switchsocketChargerYaml from "./defaultYaml/switchsocketCharger.yaml?raw";
 import sgreadyYaml from "./defaultYaml/sgready.yaml?raw";
-import sgreadyBoostYaml from "./defaultYaml/sgreadyBoost.yaml?raw";
+import sgreadyRelayYaml from "./defaultYaml/sgreadyRelay.yaml?raw";
 import { LOADPOINT_TYPE, type LoadpointType } from "@/types/evcc";
 
 const initialValues = {
@@ -106,7 +107,7 @@ export default defineComponent({
 				this.currentTemplate?.Params.some((p: TemplateParam) => p.Name === "connector") &&
 				this.currentTemplate?.Params.some((p: TemplateParam) => p.Name === "stationid");
 			if (isOcpp && this.currentValues) {
-				return `ws://${window.location.hostname}:8887/${this.currentValues["stationid"] || ""}`;
+				return `ws://${window.location.hostname}:8887/${this.currentValues.stationid || ""}`;
 			}
 			return null;
 		},
@@ -122,7 +123,7 @@ export default defineComponent({
 						...products.filter((p) => p.group === "heatinggeneric"),
 						...[
 							ConfigType.Custom,
-							ConfigType.SgReadyBoost,
+							ConfigType.SgReadyRelay,
 							ConfigType.SgReady,
 							ConfigType.Heatpump,
 							ConfigType.SwitchSocket,
@@ -174,9 +175,9 @@ export default defineComponent({
 			);
 		},
 		transformApiData(data: ApiData): ApiData {
-			if (this.isYamlInput(data["type"] as ConfigType)) {
+			if (data.type && this.isYamlInput(data.type)) {
 				// Icon is extracted from yaml on GET for UI purpose only. Don't write it back.
-				delete data["icon"];
+				delete data.icon;
 			}
 			return data;
 		},
@@ -186,10 +187,14 @@ export default defineComponent({
 				ConfigType.Heatpump,
 				ConfigType.SwitchSocket,
 				ConfigType.SgReady,
-				ConfigType.SgReadyBoost,
+				ConfigType.SgReadyRelay,
+				ConfigType.SgReadyBoost, // deprecated
 			].includes(type);
 		},
-		async handleTemplateChange(e: Event, values: DeviceValues) {
+		isTypeDeprecated(type: ConfigType): boolean {
+			return type === ConfigType.SgReadyBoost;
+		},
+		handleTemplateChange(e: Event, values: DeviceValues) {
 			const value = (e.target as HTMLSelectElement).value as ConfigType;
 			if (this.isYamlInput(value)) {
 				values.type = value;
@@ -210,8 +215,8 @@ export default defineComponent({
 					}
 				});
 				// default heater icon
-				if (hasParam("icon") && values["icon"] === undefined) {
-					values["icon"] = "heater";
+				if (hasParam("icon") && values.icon === undefined) {
+					values.icon = "heater";
 				}
 			}
 		},
@@ -225,8 +230,8 @@ export default defineComponent({
 					return this.isHeating ? switchsocketHeaterYaml : switchsocketChargerYaml;
 				case ConfigType.SgReady:
 					return sgreadyYaml;
-				case ConfigType.SgReadyBoost:
-					return sgreadyBoostYaml;
+				case ConfigType.SgReadyRelay:
+					return sgreadyRelayYaml;
 				default: // template
 					return "";
 			}
