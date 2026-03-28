@@ -2,6 +2,7 @@ package vehicle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/evcc-io/evcc/util"
 )
 
-//go:generate go tool decorate -f decorateVehicle -b api.Vehicle -t "api.SocLimiter,GetLimitSoc,func() (int64, error)" -t "api.ChargeState,Status,func() (api.ChargeStatus, error)" -t "api.VehicleRange,Range,func() (int64, error)" -t "api.VehicleOdometer,Odometer,func() (float64, error)" -t "api.VehicleClimater,Climater,func() (bool, error)" -t "api.CurrentController,MaxCurrent,func(int64) error" -t "api.CurrentGetter,GetMaxCurrent,func() (float64, error)" -t "api.VehicleFinishTimer,FinishTime,func() (time.Time, error)" -t "api.Resurrector,WakeUp,func() error" -t "api.ChargeController,ChargeEnable,func(bool) error"
+//go:generate go tool decorate -f decorateVehicle -b api.Vehicle -t api.SocLimiter,api.ChargeState,api.VehicleRange,api.VehicleOdometer,api.VehicleClimater,api.CurrentController,api.CurrentGetter,api.VehicleFinishTimer,api.Resurrector,api.ChargeController,api.ChargeRater
 
 // Vehicle is an api.Vehicle implementation with configurable getters and setters.
 type Vehicle struct {
@@ -37,6 +38,7 @@ func NewConfigurableFromConfig(ctx context.Context, other map[string]any) (api.V
 		FinishTime    *plugin.Config
 		Wakeup        *plugin.Config
 		ChargeEnable  *plugin.Config
+		ChargedEnergy *plugin.Config
 	}
 
 	if err := util.DecodeOther(other, &cc); err != nil {
@@ -139,7 +141,26 @@ func NewConfigurableFromConfig(ctx context.Context, other map[string]any) (api.V
 		return nil, fmt.Errorf("chargeEnable: %w", err)
 	}
 
-	return decorateVehicle(v, limitSoc, status, rng, odo, climater, maxCurrent, getMaxCurrent, finishTime, wakeup, chargeEnable), nil
+	// decorate chargedenergy
+	var chargedEnergy func() (float64, error)
+	if cc.ChargedEnergy != nil {
+		var err error
+		chargedEnergy, err = cc.ChargedEnergy.FloatGetter(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("charged energy: %w", err)
+		}
+	}
+
+	switch {
+	case maxCurrent == nil && getMaxCurrent != nil:
+		return nil, errors.New("cannot have current without current control")
+	case status == nil && maxCurrent != nil:
+		return nil, errors.New("cannot have current control without status")
+	case status == nil && chargeEnable != nil:
+		return nil, errors.New("cannot have charge control without status")
+	}
+
+	return decorateVehicle(v, limitSoc, status, rng, odo, climater, maxCurrent, getMaxCurrent, finishTime, wakeup, chargeEnable, chargedEnergy), nil
 }
 
 // Soc implements the api.Vehicle interface

@@ -73,7 +73,7 @@ func NewEEBusFromConfig(ctx context.Context, other map[string]any) (api.Charger,
 	return NewEEBus(ctx, cc.Ski, cc.Ip, cc.Meter, hasChargedEnergy, cc.VasVW)
 }
 
-//go:generate go tool decorate -f decorateEEBus -b *EEBus -r api.Charger -t "api.Meter,CurrentPower,func() (float64, error)" -t "api.PhaseCurrents,Currents,func() (float64, float64, float64, error)" -t "api.ChargeRater,ChargedEnergy,func() (float64, error)"
+//go:generate go tool decorate -f decorateEEBus -b *EEBus -r api.Charger -t api.Meter,api.PhaseCurrents,api.ChargeRater
 
 // NewEEBus creates EEBus charger
 func NewEEBus(ctx context.Context, ski, ip string, hasMeter, hasChargedEnergy, vasVW bool) (api.Charger, error) {
@@ -99,6 +99,12 @@ func NewEEBus(ctx context.Context, ski, ip string, hasMeter, hasChargedEnergy, v
 		eebus.Instance.UnregisterDevice(ski, c)
 		return nil, err
 	}
+
+	// unregister device when context is cancelled (e.g. UI config validation)
+	go func() {
+		<-ctx.Done()
+		eebus.Instance.UnregisterDevice(ski, c)
+	}()
 
 	if hasMeter {
 		var energyG func() (float64, error)

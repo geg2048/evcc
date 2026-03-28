@@ -13,19 +13,12 @@ import (
 
 const ApiURL = "https://api-cardata.bmwgroup.com"
 
-var Config = oauth2.Config{
-	Scopes: []string{"authenticate_user", "openid", "cardata:streaming:read", "cardata:api:read"},
-	Endpoint: oauth2.Endpoint{
-		DeviceAuthURL: "https://customer.bmwgroup.com/gcdm/oauth/device/code",
-		TokenURL:      "https://customer.bmwgroup.com/gcdm/oauth/token",
-		AuthStyle:     oauth2.AuthStyleInParams,
-	},
-}
-
 // requiredKeys are the necessary data dictionary entities according to
 // https://mybmwweb-utilities.api.bmw/de-de/utilities/bmw/api/cd/catalogue/file
 var requiredKeys = []string{
 	"vehicle.body.chargingPort.status",
+	"vehicle.cabin.infotainment.navigation.currentLocation.latitude",
+	"vehicle.cabin.infotainment.navigation.currentLocation.longitude",
 	"vehicle.cabin.hvac.preconditioning.status.comfortState",
 	"vehicle.drivetrain.batteryManagement.header",
 	"vehicle.drivetrain.electricEngine.charging.hvStatus",
@@ -37,7 +30,7 @@ var requiredKeys = []string{
 	"vehicle.vehicle.travelledDistance",
 }
 
-const requiredVersion = "v3"
+const requiredVersion = "v4"
 
 type API struct {
 	*request.Helper
